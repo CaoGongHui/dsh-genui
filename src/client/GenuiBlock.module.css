@@ -1654,7 +1654,27 @@ img.mediaPlayer { aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsl
 
 /* ---------- mermaid ---------- */
 
-.mermaid { overflow-x: auto; padding: var(--dsl-g-gap-xs) 0; }
+/* Pele theme bridge. The engine emits `var(--pele-*)` everywhere, so the host
+   palette is applied by inheritance instead of by re-rendering with resolved
+   colours: switching the theme recolours an already-drawn diagram, and a card
+   that overrides a token locally carries into its diagrams for free. `bg` is a
+   real surface (not transparent) because git-graph commit labels are drawn in
+   it; `surface-alt` stays a quiet wash so subgraphs do not compete with nodes. */
+.mermaid {
+  overflow-x: auto;
+  padding: var(--dsl-g-gap-xs) 0;
+  --pele-bg: var(--dsl-g-surface);
+  --pele-fg: var(--dsw-alias-label-primary, #e6e6e6);
+  --pele-muted: var(--dsw-alias-label-tertiary, #8a8a92);
+  --pele-line: var(--dsw-alias-label-tertiary, #8a8a92);
+  --pele-surface: var(--dsl-g-surface);
+  --pele-surface-alt: color-mix(in srgb, var(--dsw-alias-label-primary) 4%, transparent);
+  --pele-border: var(--dsw-alias-border-l2, rgba(255, 255, 255, 0.12));
+  --pele-accent: var(--dsl-g-accent);
+  --pele-critical: var(--dsw-alias-state-error-primary, #ff6b6b);
+  --pele-error: var(--dsw-alias-state-error-primary, #ff6b6b);
+  --pele-radius: var(--dsl-g-radius-control);
+}
 .mermaid svg { max-width: 100%; height: auto; }
 .mermaidFallback { display: flex; flex-direction: column; gap: var(--dsl-g-gap-sm); }
 .mermaidFallback pre {

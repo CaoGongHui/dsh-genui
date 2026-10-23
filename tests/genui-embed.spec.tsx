@@ -25,7 +25,7 @@ it('embeds the same renderer with native persistence, local assets and action re
   fireEvent.click(screen.getByRole('button', { name: '继续' }))
   await vi.waitFor(() => expect(action).toHaveBeenCalledWith('explain', expect.any(Object)))
   setGenuiAssetBase('file:///Applications/WeiBei.app/Contents/Resources/GenUI/')
-  expect(assetUrl('mermaid.js')).toBe('file:///Applications/WeiBei.app/Contents/Resources/GenUI/mermaid.js')
+  expect(assetUrl('pele.js')).toBe('file:///Applications/WeiBei.app/Contents/Resources/GenUI/pele.js')
 })
 
 it('does not echo unchanged state when a host saves with an inline callback', () => {

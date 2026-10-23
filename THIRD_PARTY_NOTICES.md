@@ -36,7 +36,12 @@ The colour values referenced by the `--dsl-g-*` token layer are *not* copied
 from that project: they resolve through the host's `--dsw-alias-*` tokens, and
 the literals in `GenuiBlock.module.css` are last-resort fallbacks.
 
-## KaTeX / Mermaid / ECharts / three.js
+## KaTeX / Pele / ECharts / three.js
 
 Those engines are loaded at runtime from their own packages under their own
 licenses; they are not vendored into this repository.
+
+- **Pele** (<https://github.com/obsidianmd/pele>, MIT) renders the `mermaid`
+  component's Mermaid 12.1 syntax to SVG. It is bundled into the on-demand
+  `lib/assets/pele.js`; Mermaid itself is no longer a dependency. Pele's
+  parser specs and grammar files derived from Mermaid remain MIT-licensed.

@@ -1,13 +1,14 @@
 /**
- * Pure mermaid source utilities — no mermaid import, so this module can ship
- * in the main client bundle while the heavy mermaid engine lives in a lazy
- * asset bundle (`lib/assets/mermaid.js`, loaded on demand by mermaid-lazy).
+ * Pure mermaid source utilities — no engine import, so this module can ship
+ * in the main client bundle while the heavy diagram engine (Pele) lives in a
+ * lazy asset bundle (`lib/assets/pele.js`, loaded on demand by mermaid-lazy).
  * @module @changfenhuang/dsh-genui/client/mermaid-safe
  */
 
 /** Reject any rendered SVG that carries script, event-handler attributes, or
- * `javascript:` URIs. Under mermaid's strict security level a legitimate
- * diagram never contains these, so a hit means the sanitizer failed (a
+ * `javascript:` URIs. Pele escapes labels and filters link schemes, so a
+ * legitimate diagram never contains these; a hit means the engine or its
+ * input handling regressed (a
  * mermaid regression or a bypass): throw and let the caller show the plain
  * source fallback instead of injecting the markup. Cheap linear scan over
  * the SVG string; happens once per diagram.

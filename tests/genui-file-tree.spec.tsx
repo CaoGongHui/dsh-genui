@@ -149,13 +149,16 @@ describe('component design contract (measured defects)', () => {
     expect(css()).toMatch(/\.block \*, \.block \*::before, \.block \*::after,[\s\S]{0,120}?box-sizing: border-box/)
   })
 
-  it('themes mermaid from host tokens, not a stock palette', () => {
-    const core = readFileSync(join(process.cwd(), 'src/client/mermaid-core.ts'), 'utf8')
-    // Stock themes drew grey boxes with sharp corners next to rounded host UI.
-    expect(core).toMatch(/theme: 'base'/)
-    expect(core).toMatch(/themeVariables: \{/)
-    expect(core).toMatch(/--dsw-alias-bg-layer-2/)
-    expect(core).toMatch(/rx: 8px; ry: 8px/)
+  it('themes diagram SVGs from host tokens, not a stock palette', () => {
+    const css = readFileSync(join(process.cwd(), 'src/client/GenuiBlock.module.css'), 'utf8')
+    const block = /\.mermaid \{[\s\S]*?\n\}/.exec(css)
+    expect(block, '.mermaid rule must exist').not.toBeNull()
+    // Pele reads `--pele-*`; the card bridges them to the host's alias tokens
+    // so a theme switch recolours an already-rendered diagram.
+    expect(block![0]).toMatch(/--pele-fg: var\(--dsw-alias-label-primary/)
+    expect(block![0]).toMatch(/--pele-surface: var\(--dsl-g-surface\)/)
+    expect(block![0]).toMatch(/--pele-border: var\(--dsw-alias-border-l2/)
+    expect(block![0]).toMatch(/--pele-accent: var\(--dsl-g-accent\)/)
   })
 })
 

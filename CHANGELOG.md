@@ -12,6 +12,7 @@
 
 ### 变更
 
+- **图表引擎从 Mermaid.js 换成 Pele**：`mermaid` 节点改由 [Pele](https://github.com/obsidianmd/pele)（MIT，Obsidian 出品）把 Mermaid 12.1 语法渲染成 SVG。按需资产 `lib/assets/mermaid.js`（3.4 MB）换成 `lib/assets/pele.js`（310 kB / gzip 113 kB，只注册白名单内的 9 种图），渲染由异步布局改为同步输出，配色从 `themeVariables` 改为 `.mermaid` 上的 `--pele-*` → 宿主 `--dsw-alias-*` 桥接，切主题只换 CSS 变量、不再重绘；`mermaid` devDependency、`mermaid-core.ts`、`asset-mermaid.ts`、`mermaid-colors.ts` 与 `check-mermaid-browser.mjs` 基准脚本一并移除。种类白名单、`ensureFlowchartKind`、`repairMermaidSource`、`assertSafeSvg` 出口检查保持不变。
 - 语义底纹浓度由 8% 调整为 12%（深色主题 18%）：8% 在白色画布上的明度差不足 3%，badge、callout、card tone 与新图标底板都会退化为纯白。新增 `--dsl-g-tint-quiet` 保留旧的 8% 档位。
 
 ### 修复

@@ -108,7 +108,7 @@ npm install @changfenhuang/dsh-genui
 
 > `npm install` only adds the dependency; it does not register the plugin with DSH. Use `dsh plugin add` above when installing it into DSH.
 
-> ⚠️ **Don't use `link:` on a freshly cloned directory** — `link:` does not install the plugin's dependencies (mermaid / three / react), so the renderer will break. Use the npm command above for normal installation; reserve `link:` for local development iteration (see below).
+> ⚠️ **Don't use `link:` on a freshly cloned directory** — `link:` does not install the plugin's dependencies (pele / three / react), so the renderer will break. Use the npm command above for normal installation; reserve `link:` for local development iteration (see below).
 
 ### Package name and version matter
 
@@ -184,7 +184,7 @@ The following is the detailed capability reference. Every behavior is constraine
 - **Fence auto-repair**: enabled by default; set `fenceFeedback: false` in this plugin's config (under the plugin entry's `config:` in your profile's cordis.patch.yml) to disable same-turn fence corrections. A validated GenUI turn that ends with reasoning only still becomes `EMPTY_RESPONSE` and uses the host's retry policy. When a reply's final dsh-ui fence fails to render, the plugin steers the SAME turn with the per-node diagnosis so the model can resend a fixed fence. At most two corrections are sent per turn, shared by render failures and validated turns with no formal delivery; each fence fingerprint is corrected once per turn, and a nothing-delivered reminder is sent once per turn. A new turn can correct the same failed fence again. Plugin reload restores the current turn's fence fingerprints and correction count, along with delivery reminders, from persisted correction messages. Corrections are never sent in subagent sessions.
 - **Self-healing & limits**: every fence passes a spec guard — bad nodes are silently dropped (the surviving siblings keep rendering: one bad component no longer degrades the whole fence), numbers clamped, strings truncated; the whole tree is capped at 200 nodes / 8 nesting levels; pathological specs never crash the UI
 - **Canonical component protocol**: native field aliases such as `card.label` → `title`, `table.data`/`table.items` → `rows`, `callout.kind`/`callout.desc` → `tone`/`content` (tone value `danger` → `error`), `steps.items` → `steps`, `keyvalue.items` → `pairs` (record `label` → `key`), and `file-tree.nodes` → `items` (record `label` → `name`, `type` defaults to `dir` when children exist) are normalized deterministically before validation and rendering. A root-level component array is adopted as `items`, and a double-encoded JSON string is decoded once. `validate_dsh_ui` reports these normalizations and warns about unknown native fields without blocking custom renderer nodes.
-- **Chart error self-healing**: mermaid failures auto-retry with repairs (strip backticks, quote Chinese/space labels, remove `<br/>`) before degrading to source; a broken chart never hits the screen
+- **Chart error self-healing**: diagram failures auto-retry with repairs (strip backticks, quote Chinese/space labels, remove `<br/>`) before degrading to source; a broken chart never hits the screen
 - **Accessibility**: tabs/accordions/switches/progress bars carry full ARIA and keyboard navigation (arrow keys switch tabs, Home/End jump)
 - **Zero intrusion**: without the plugin, fences are just code blocks — no errors, no session pollution
 
@@ -223,7 +223,7 @@ What you see: a themed bar chart with tooltips and axis labels — rendered by E
 
 The model writes the interface description as JSON inside a `dsh-ui` fence; the browser-side renderer (`src/client`) identifies it in the DSH conversation DOM and renders it. Components are whitelisted — the model can't smuggle in HTML or scripts; function expressions go through a standalone parser, never `eval`.
 
-The core render package stays light (≈110 KB min / 28 KB gzip); the mermaid, three.js, and echarts engines are bundled separately as on-demand assets (loaded through the plugin's self-registered HTTP routes the first time they're used), so startup only downloads the rendering core.
+The core render package stays light (≈110 KB min / 28 KB gzip); the Pele diagram renderer, three.js, and echarts engines are bundled separately as on-demand assets (loaded through the plugin's self-registered HTTP routes the first time they're used), so startup only downloads the rendering core.
 
 ## Export a GenUI artifact
 
@@ -235,7 +235,7 @@ Settled GenUI blocks expose **Export → HTML** and **GenUI JSON**. The `.html` 
 - **Chat UI goes blank when rendering a dsh-ui fence?** This dsh-genui release requires DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`.
 - **`dsh: pnpm not found on PATH`?** Install pnpm, then **open a new terminal** and retry (`corepack enable` or `npm i -g pnpm`).
 - **npm install returns 404?** The npm package is public and requires no login. Run `npm view @changfenhuang/dsh-genui version` to verify the package name and public registry; if a newly published version still returns 404, retry shortly.
-- **Installed but scene3d/mermaid/echarts don't render?** The engines (mermaid / three / echarts) are no longer inlined in client.js — they load on demand the first time they're used (`/plugins/@changfenhuang/dsh-genui/assets/*.js`, hosted by the plugin's own HTTP routes). First restart dsh web + hard refresh (Cmd+Shift+R); still broken, remove and reinstall (`dsh plugin --profile web remove @changfenhuang/dsh-genui`, then add again). Hosts without the asset routes degrade to source/load-error hints — update dsh.
+- **Installed but scene3d/mermaid/echarts don't render?** The engines (Pele / three / echarts) are no longer inlined in client.js — they load on demand the first time they're used (`/plugins/@changfenhuang/dsh-genui/assets/*.js`, hosted by the plugin's own HTTP routes). First restart dsh web + hard refresh (Cmd+Shift+R); still broken, remove and reinstall (`dsh plugin --profile web remove @changfenhuang/dsh-genui`, then add again). Hosts without the asset routes degrade to source/load-error hints — update dsh.
 - **Model not outputting fences?** New sessions pick it up after a restart; or just say "output it with dsh-ui".
 - **No lib/ after cloning?** Build it yourself: `pnpm install && pnpm run check`.
 

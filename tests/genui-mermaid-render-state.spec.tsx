@@ -221,7 +221,7 @@ describe('Mermaid render state', () => {
 const scheduled = await vi.importActual<typeof import('../src/client/mermaid-lazy.ts')>('../src/client/mermaid-lazy.ts')
 
 function engine(render: (code: string) => Promise<string>): void {
-  (window as unknown as { __GenuiAssets__: unknown }).__GenuiAssets__ = { mermaid: { renderMermaid: render } }
+  (window as unknown as { __GenuiAssets__: unknown }).__GenuiAssets__ = { pele: { renderMermaid: render } }
 }
 
 describe('Mermaid render scheduling', () => {

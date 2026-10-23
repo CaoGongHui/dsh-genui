@@ -5,7 +5,7 @@ import { ICONS } from '../icons/icon-data.ts'
 import { safeMediaSrc } from '../genui-runtime/value-utils.ts'
 import type { GenuiPortabilityReport, GenuiStandaloneAsset } from './types.ts'
 
-const ASSET_ORDER: GenuiStandaloneAsset[] = ['mermaid', 'three', 'echarts-core', 'echarts-full', 'icons']
+const ASSET_ORDER: GenuiStandaloneAsset[] = ['pele', 'three', 'echarts-core', 'echarts-full', 'icons']
 
 /** 递归收集当前节点树依赖的引擎和媒体信息。 */
 function scan(items: unknown[], report: GenuiPortabilityReport, assets: Set<GenuiStandaloneAsset>): void {
@@ -13,7 +13,7 @@ function scan(items: unknown[], report: GenuiPortabilityReport, assets: Set<Genu
     if (typeof item !== 'object' || item === null || !('type' in item) || typeof item.type !== 'string') continue
     const node = item as GenuiNode & Record<string, unknown>
     if (!GENUI_NATIVE_TYPES.has(node.type)) report.customTypes.push(node.type)
-    if (node.type === 'mermaid') assets.add('mermaid')
+    if (node.type === 'mermaid') assets.add('pele')
     if (node.type === 'scene3d') assets.add('three')
     if (node.type === 'echart') assets.add(echartEngineFor(node as Extract<GenuiNode, { type: 'echart' }>))
     // An icon outside the inlined 62 needs the lazily-fetched catalogue; a

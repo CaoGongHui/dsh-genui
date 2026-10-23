@@ -24,7 +24,7 @@ import { installFenceFeedback } from './fence-feedback.ts'
 /* ---------------- lazy engine asset route ---------------- */
 
 /**
- * The mermaid/three engines ship as standalone IIFE bundles under
+ * The diagram (Pele) and three engines ship as standalone IIFE bundles under
  * `lib/assets/` and are fetched by the client ONLY when a spec needs them.
  * This route serves them from the plugin's own package directory through the
  * host webserver service — the longest-prefix rule lets it win over the

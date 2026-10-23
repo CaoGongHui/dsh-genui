@@ -48,12 +48,12 @@ describe('standalone HTML serialization', () => {
     const artifact = createGenuiArtifact({ items: [{ type: 'mermaid', code: 'graph TD; A-->B' }] } as unknown as GenuiSpec)
     const html = createStandaloneHtmlDocument(artifact, new Map([
       ['standalone-runtime.js', new TextEncoder().encode('runtime')],
-      ['mermaid.js', new TextEncoder().encode('mermaid-engine')],
+      ['pele.js', new TextEncoder().encode('pele-engine')],
     ]))
     const doc = parseHtml(html)
 
-    expect(new Set(bundleNames(doc))).toEqual(new Set(['mermaid', 'runtime']))
-    expect(bundleText(doc, 'mermaid')).toBe('mermaid-engine')
+    expect(new Set(bundleNames(doc))).toEqual(new Set(['pele', 'runtime']))
+    expect(bundleText(doc, 'pele')).toBe('pele-engine')
     expect(bundleText(doc, 'runtime')).toBe('runtime')
   })
 

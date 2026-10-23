@@ -108,7 +108,7 @@ npm install @changfenhuang/dsh-genui
 
 > `npm install` 只添加依赖，不会把插件注册到 DSH；在 DSH 中使用时仍应执行上面的 `dsh plugin add`。
 
-> ⚠️ **别用 `link:` 装一个刚 clone 的目录**——`link:` 不会安装插件的依赖（mermaid / three / react），装完渲染器会挂。正常安装请使用上面的 npm 命令；只有本地开发迭代才用 `link:`（见下文）。
+> ⚠️ **别用 `link:` 装一个刚 clone 的目录**——`link:` 不会安装插件的依赖（pele / three / react），装完渲染器会挂。正常安装请使用上面的 npm 命令；只有本地开发迭代才用 `link:`（见下文）。
 
 ### 认准包名与版本
 
@@ -184,7 +184,7 @@ dsh plugin --profile web add link:$PWD
 - **围栏自修**：默认开启；在 profile 的 cordis.patch.yml 中本插件条目的 `config:` 下设置 `fenceFeedback: false` 可以关闭同回合围栏修正。已调用 `validate_dsh_ui` 的 GenUI 回合若只输出 reasoning 并以 `stop` 结束，仍会转换为 `EMPTY_RESPONSE`，交给宿主重试策略处理。回答最终的 dsh-ui 围栏无法渲染时，插件借宿主的轮内转向（steer）把逐节点诊断送回**同一轮**，模型重发修好的围栏。每个 turn 最多发送两条 correction，渲染失败与“已验证但没有正式交付”共用该上限；同一 turn 内相同围栏 fingerprint 只修正一次，新 turn 可以重新修正相同错误；同一 turn 的零交付提醒只发送一次。plugin reload 后会从持久化的 correction message 恢复当前 turn 的围栏去重记录、已消费的 correction 次数以及零交付提醒记录。子代理回合不会收到围栏修正。
 - **自愈与上限**：每个围栏过规格守卫——坏节点静默丢弃（同围栏其余组件照常渲染，单个坏组件不再拖垮整条围栏）、数值钳位、字符串截断，整树 ≤200 节点 / 8 层嵌套，病态 spec 不会拖垮界面
 - **统一组件协议**：`card.label` → `title`、`table.data`/`table.items` → `rows`、`callout.kind`/`callout.desc` → `tone`/`content`（tone 值 `danger` → `error`）、`steps.items` → `steps`、`keyvalue.items` → `pairs`（记录内 `label` → `key`）、`file-tree.nodes` → `items`（记录内 `label` → `name`、有 children 时缺省 `dir`）等原生字段别名会在校验和渲染前确定性归一化；根级组件数组视为 `items`、双重编码的 JSON 字符串解一层；`validate_dsh_ui` 会报告归一化结果，并对原生组件未知字段给出警告，同时保持自定义 renderer 节点的透明兼容。
-- **图错误自愈**：mermaid 渲染失败自动修复重试（剥反引号、引号化中文/空格标签、去 `<br/>`），仍失败才降级源码；错误图永不直接上屏
+- **图错误自愈**：图表渲染失败自动修复重试（剥反引号、引号化中文/空格标签、去 `<br/>`），仍失败才降级源码；错误图永不直接上屏
 - **可访问性**：tabs/折叠/开关/进度条带完整 ARIA 与键盘导航（方向键切页、Home/End 跳转）
 - **零打扰**：不装插件时围栏只是代码块，不报错、不污染会话
 
@@ -229,7 +229,7 @@ dsh plugin --profile web add link:$PWD
 
 模型把界面描述写成 JSON 放进 `dsh-ui` 围栏，浏览器端渲染器（`src/client`）从 DSH 对话 DOM 识别围栏并显示。组件是白名单的，模型无法插入 HTML 或脚本；函数表达式使用独立解析器，不调用 eval。
 
-主渲染包保持轻量（≈110 KB min / 28 KB gzip），mermaid、three.js 与 echarts 引擎单独打包为按需资产（首次用到时经插件自注册的 HTTP 路由加载），启动时只下载渲染核心。
+主渲染包保持轻量（≈110 KB min / 28 KB gzip），Pele 图表引擎、three.js 与 echarts 单独打包为按需资产（首次用到时经插件自注册的 HTTP 路由加载），启动时只下载渲染核心。
 
 ## ❓ 常见问题
 
@@ -237,7 +237,7 @@ dsh plugin --profile web add link:$PWD
 - **渲染 dsh-ui fence 时聊天界面白屏？** 此版 dsh-genui 要求 DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`。
 - **`dsh: pnpm not found on PATH`？** 装 pnpm 后**新开终端**再试（`corepack enable` 或 `npm i -g pnpm`）。
 - **npm 安装返回 404？** npm 包是公开的，无需登录。先执行 `npm view @changfenhuang/dsh-genui version` 核对包名与公共 registry；若新版本刚发布仍返回 404，稍后重试。
-- **装了但 scene3d/mermaid/echarts 不渲染？** 引擎（mermaid / three / echarts）不再内联进 client.js——它们在首次用到时按需加载（`/plugins/@changfenhuang/dsh-genui/assets/*.js`，插件自带 HTTP 路由托管）。先重启 dsh web + 硬刷新（Cmd+Shift+R）；仍不渲染就卸掉重装（`dsh plugin --profile web remove @changfenhuang/dsh-genui` 后再 add）。旧版宿主缺少资产路由时会降级显示源码/加载失败提示，更新 dsh 即可。
+- **装了但 scene3d/mermaid/echarts 不渲染？** 引擎（Pele / three / echarts）不再内联进 client.js——它们在首次用到时按需加载（`/plugins/@changfenhuang/dsh-genui/assets/*.js`，插件自带 HTTP 路由托管）。先重启 dsh web + 硬刷新（Cmd+Shift+R）；仍不渲染就卸掉重装（`dsh plugin --profile web remove @changfenhuang/dsh-genui` 后再 add）。旧版宿主缺少资产路由时会降级显示源码/加载失败提示，更新 dsh 即可。
 - **模型不主动输出？** 重启后新会话生效；或直接说"用 dsh-ui 输出"。
 - **clone 后没有 lib/？** `pnpm install && pnpm run check` 自己构建。
 
@@ -249,7 +249,7 @@ dsh plugin --profile web add link:$PWD
 
 嵌入宿主通过 `initialState` / `onStateChange` 接管持久化，使用稳定的 `stateKey` 区分界面，通过 `GenuiActionContext.Provider` 接收动作。改变 `stateKey` 会开始新的交互生命周期；同一界面的后续刷新保留输入。设置 `onStateChange` 后不读写浏览器的交互状态存储。
 
-调用 `setGenuiAssetBase` 设置本地引擎目录；从公开的 `@changfenhuang/dsh-genui/assets/mermaid`、`assets/three`、`assets/echarts-core`、`assets/echarts` 构建对应脚本。模型指引从 `@changfenhuang/dsh-genui/skill` 读取。宿主只补自己的交付通道和设计变量；渲染器仍使用本包与 `@deepseek-ai/dsh-client-ui-primitives` 的组件。构建时提供 React、CSS Modules、KaTeX 字体及所用引擎依赖。
+调用 `setGenuiAssetBase` 设置本地引擎目录；从公开的 `@changfenhuang/dsh-genui/assets/pele`、`assets/three`、`assets/echarts-core`、`assets/echarts` 构建对应脚本。模型指引从 `@changfenhuang/dsh-genui/skill` 读取。宿主只补自己的交付通道和设计变量；渲染器仍使用本包与 `@deepseek-ai/dsh-client-ui-primitives` 的组件。构建时提供 React、CSS Modules、KaTeX 字体及所用引擎依赖。
 
 ### 导出 GenUI 成果文件
 

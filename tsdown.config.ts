@@ -176,7 +176,7 @@ const clientConfig: UserConfig = {
   plugins: [purityGate(), cssModulesPlugin()],
   outputOptions: {
     entryFileNames: 'client.js',
-    // The loader fetches one script per plugin; the lazy mermaid/three
+    // The loader fetches one script per plugin; the lazy pele/three
     // engines are NOT part of this bundle anymore — they ship as standalone
     // IIFE assets under lib/assets/, fetched on demand by the runtime loaders
     // (see asset-loader.ts). Nothing heavy may re-enter this bundle.
@@ -208,7 +208,7 @@ const standaloneConfig: UserConfig = {
 }
 
 /**
- * Lazy engine assets: mermaid and three ship as standalone single-entry
+ * Lazy engine assets: pele and three ship as standalone single-entry
  * IIFEs that register themselves on `window.__GenuiAssets__` (no
  * module-loader protocol — the loaders read the global directly after script
  * injection). Two configs because rolldown refuses IIFE with multiple
@@ -216,7 +216,7 @@ const standaloneConfig: UserConfig = {
  * main client bundle never contains either engine, so the eager download
  * drops from ~9 MB to the small renderer core.
  */
-function assetConfig(name: 'mermaid' | 'three' | 'echarts' | 'echarts-core' | 'echarts-full' | 'icons', entry: string): UserConfig {
+function assetConfig(name: 'pele' | 'three' | 'echarts' | 'echarts-core' | 'echarts-full' | 'icons', entry: string): UserConfig {
   return {
     name: `${ID}/assets/${name}`,
     entry: { [`assets/${name}`]: entry },
@@ -264,7 +264,7 @@ export default [
   libConfig,
   clientConfig,
   standaloneConfig,
-  assetConfig('mermaid', 'src/client/asset-mermaid.ts'),
+  assetConfig('pele', 'src/client/asset-pele.ts'),
   assetConfig('three', 'src/client/asset-three.ts'),
   assetConfig('echarts-core', 'src/client/asset-echarts-core.ts'),
   assetConfig('echarts-full', 'src/client/asset-echarts.ts'),

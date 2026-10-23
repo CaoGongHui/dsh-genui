@@ -339,7 +339,7 @@ try {
   const parts: Array<[string, string]> = [
     ['steps', '[class*="steps"]'],
     ['timeline', '[class*="timeline"]'],
-    ['mermaid', '[data-genui] svg[id^="mermaid"], [class*="mermaid"] svg'],
+    ['mermaid', '[data-genui-mermaid] svg, [class*="mermaid"] svg'],
     ['diagram', '[class*="diagram"]'],
     ['quiz', '[class*="quiz"]'],
     ['media', '[class*="media"]'],

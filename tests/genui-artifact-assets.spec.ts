@@ -7,11 +7,11 @@ const report = (items: unknown[]) => analyzeGenuiPortability({ items } as GenuiS
 describe('GenUI standalone asset selection', () => {
   it('chooses engines only for nodes that require them', () => {
     expect(report([{ type: 'text', content: 'hello' }, { type: 'chart', data: [] }]).requiredAssets).toEqual([])
-    expect(report([{ type: 'mermaid', code: 'graph TD; A-->B' }]).requiredAssets).toEqual(['mermaid'])
+    expect(report([{ type: 'mermaid', code: 'graph TD; A-->B' }]).requiredAssets).toEqual(['pele'])
     expect(report([{ type: 'scene3d', meshes: [] }]).requiredAssets).toEqual(['three'])
     expect(report([{ type: 'echart', preset: 'bar' }]).requiredAssets).toEqual(['echarts-core'])
     expect(report([{ type: 'echart', preset: 'radar' }]).requiredAssets).toEqual(['echarts-full'])
-    expect(report([{ type: 'mermaid', code: 'x' }, { type: 'echart', option: {} }]).requiredAssets).toEqual(['mermaid', 'echarts-full'])
+    expect(report([{ type: 'mermaid', code: 'x' }, { type: 'echart', option: {} }]).requiredAssets).toEqual(['pele', 'echarts-full'])
   })
 
   it('finds nested engines and lists custom nodes, actions, and network media', () => {

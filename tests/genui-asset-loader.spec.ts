@@ -15,7 +15,7 @@ const PLUGIN_ID = '@changfenhuang/dsh-genui'
 
 describe('assetUrl', () => {
   it('returns the asset path without a query when the boot graph is absent', () => {
-    expect(assetUrl('mermaid.js')).toBe(`/plugins/${PLUGIN_ID}/assets/mermaid.js`)
+    expect(assetUrl('pele.js')).toBe(`/plugins/${PLUGIN_ID}/assets/pele.js`)
   })
 
   it('appends the plugin row rev from the boot graph', () => {
@@ -32,16 +32,16 @@ describe('assetUrl', () => {
 describe('loadGenuiAsset', () => {
   it('injects one script per file and resolves the registered engine', async () => {
     const api = { hello: 'engine' }
-    const promise = loadGenuiAsset<typeof api>('mermaid')
+    const promise = loadGenuiAsset<typeof api>('pele')
     const scripts = document.head.querySelectorAll('script')
     expect(scripts).toHaveLength(1)
-    expect(scripts[0]!.getAttribute('src')).toBe(`/plugins/${PLUGIN_ID}/assets/mermaid.js`)
+    expect(scripts[0]!.getAttribute('src')).toBe(`/plugins/${PLUGIN_ID}/assets/pele.js`)
     // Simulate the bundle having executed and registered its engine.
-    ;(window as unknown as Record<string, unknown>).__GenuiAssets__ = { mermaid: api }
+    ;(window as unknown as Record<string, unknown>).__GenuiAssets__ = { pele: api }
     scripts[0]!.dispatchEvent(new Event('load'))
     await expect(promise).resolves.toBe(api)
     // Memoized: a second request reuses the same promise, no new script tag.
-    await loadGenuiAsset('mermaid')
+    await loadGenuiAsset('pele')
     expect(document.head.querySelectorAll('script')).toHaveLength(1)
   })
 
@@ -70,7 +70,7 @@ describe('idle prefetch', () => {
     prefetchGenuiAssets()
     const links = [...document.head.querySelectorAll('link[rel="prefetch"]')]
     expect(links.map(l => l.getAttribute('href'))).toEqual([
-      `/plugins/@changfenhuang/dsh-genui/assets/mermaid.js`,
+      `/plugins/@changfenhuang/dsh-genui/assets/pele.js`,
       `/plugins/@changfenhuang/dsh-genui/assets/three.js`,
     ])
     expect(links.every(l => (l as HTMLLinkElement).as === 'script')).toBe(true)

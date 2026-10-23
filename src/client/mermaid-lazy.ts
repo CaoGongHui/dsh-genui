@@ -1,9 +1,9 @@
 /**
- * Runtime loader for the mermaid engine. The heavy mermaid bundle ships as a
- * separate asset (`lib/assets/mermaid.js`, served by the plugin's own HTTP
+ * Runtime loader for the diagram engine. The heavy Pele bundle ships as a
+ * separate asset (`lib/assets/pele.js`, served by the plugin's own HTTP
  * route) and is fetched ONLY when a spec contains a `mermaid` node — the
  * main client bundle stays small and most conversations never download
- * mermaid at all. On a host that does not serve the asset (older harness) the
+ * Pele at all. On a host that does not serve the asset (older harness) the
  * load rejects and the MermaidNode shows its plain-source fallback.
  *
  * The pure source utilities stay statically exported from mermaid-safe so
@@ -13,7 +13,7 @@
 import { loadGenuiAsset } from './asset-loader.ts'
 export { assertSafeSvg, ensureFlowchartKind, repairMermaidSource } from './mermaid-safe.ts'
 
-/** The engine surface registered by the mermaid asset bundle. */
+/** The engine surface registered by the pele asset bundle. */
 interface MermaidAssetApi {
   renderMermaid: (code: string, target?: HTMLElement) => Promise<string>
 }
@@ -76,7 +76,7 @@ function pump(): void {
       let deferred = false
       try {
         job.signal?.throwIfAborted()
-        const api = await loadGenuiAsset<MermaidAssetApi>('mermaid')
+        const api = await loadGenuiAsset<MermaidAssetApi>('pele')
         job.signal?.throwIfAborted()
         // Loading the engine may outlive a scroll or visibility change.
         if (document.hidden || performance.now() < scrollUntil) {

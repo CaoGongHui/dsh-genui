@@ -31,13 +31,13 @@ import { bridgeHostLocale } from './i18n/index.ts'
 import type { InputTriggerServiceContract } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import { assetUrl } from './asset-loader.ts'
 
-/** Add low-priority prefetch links for the lazy engine assets (mermaid/three).
+/** Add low-priority prefetch links for the lazy engine assets (pele/three).
  * Browser-dependent: some engines ignore `<link rel=prefetch>`; harmless
  * either way — the on-demand loader still covers a cache miss. Exported for
  * tests. */
 export function prefetchGenuiAssets(): void {
   if (typeof document === 'undefined') return
-  for (const file of ['mermaid.js', 'three.js']) {
+  for (const file of ['pele.js', 'three.js']) {
     if (document.head.querySelector(`link[rel="prefetch"][href="${assetUrl(file)}"]`) !== null) continue
     const link = document.createElement('link')
     link.rel = 'prefetch'
