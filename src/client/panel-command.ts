@@ -54,7 +54,7 @@ export function defaultPanelSpec(): GenuiSpec {
           { title: t('panel.default.group.single'), desc: 'text button input select checkbox link badge stat progress divider avatar spacer' },
           { title: t('panel.default.group.composite'), desc: 'row col grid card list table chart tabs' },
           { title: t('panel.default.group.data'), desc: 'plot callout steps keyvalue diff json code' },
-          { title: t('panel.default.group.interactive'), desc: 'radio switch textarea accordion copy' },
+          { title: t('panel.default.group.interactive'), desc: 'radio switch textarea accordion copy calc' },
           { title: t('panel.default.group.advanced'), desc: 'mermaid scene3d timeline file-tree breadcrumb' },
           { title: t('panel.default.group.teaching'), desc: 'quiz' },
         ],

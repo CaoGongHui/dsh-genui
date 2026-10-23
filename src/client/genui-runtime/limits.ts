@@ -43,6 +43,10 @@ export const GENUI_LIMITS = {
    *  so a wide figure still costs one node against `maxNodes`. */
   maxBlocksRows: 14,
   maxBlocksCells: 16,
+  /** Maximum `calc` inputs / outputs, and characters per formula. */
+  maxCalcInputs: 12,
+  maxCalcOutputs: 12,
+  maxCalcExpr: 300,
   /** Maximum `diagram` nodes / edges / zones / focal accents. */
   maxDiagramNodes: 9,
   maxDiagramEdges: 12,

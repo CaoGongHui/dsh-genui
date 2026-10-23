@@ -21,8 +21,13 @@ export interface CheckboxSubmissionMember {
 export interface FieldSubmissionMember {
   kind: 'field'
   key: string
-  fieldType: 'input' | 'textarea' | 'select' | 'slider'
+  fieldType: 'input' | 'textarea' | 'select' | 'slider' | 'calc'
   secret: boolean
+}
+
+/** Field key a calc input persists under (and submits as): `${id}.${name}`. */
+export function calcFieldKey(id: string, name: string): string {
+  return `${id}.${name}`
 }
 
 export interface SubmissionRegistry {
@@ -54,6 +59,22 @@ export function analyzeSubmissionRegistry(spec: GenuiSpec): { registry: Submissi
   walkGenuiNodes(spec, (node, path) => {
     if (node.type === 'submit') {
       if (node.groups !== undefined) submits.push({ groups: node.groups, path })
+      return
+    }
+    if (node.type === 'calc') {
+      // One field per input, only when the calculator opts in with an `id`.
+      // The spec may be unrepaired here (validation path): read defensively.
+      if (typeof node.id !== 'string' || !Array.isArray(node.inputs)) return
+      node.inputs.forEach((input, i) => {
+        if (typeof input?.name !== 'string') return
+        const key = calcFieldKey(node.id!, input.name)
+        if (members.has(key)) {
+          diagnostics.push(`${path}.inputs[${i}].name conflicts with ${paths.get(key)}: submission key '${key}' is already used`)
+          return
+        }
+        members.set(key, { kind: 'field', key, fieldType: 'calc', secret: false })
+        paths.set(key, `${path}.inputs[${i}].name`)
+      })
       return
     }
     let member: SubmissionMember | undefined

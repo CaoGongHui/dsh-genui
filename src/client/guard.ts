@@ -24,8 +24,9 @@ import {
   BADGE_TONES, BUTTON_TONES, CALLOUT_TONES, CARD_TONES, CHART_KINDS, COMPONENT_SCHEMAS, HERO_TONES,
   DIAGRAM_EDGE_KINDS, DIAGRAM_KINDS, DIAGRAM_NODE_TYPES, DIAGRAM_ROUTES, DIAGRAM_VARIANTS,
   ECHART_PRESETS, FILE_TYPES, GENUI_NATIVE_TYPES, GENUI_SPEC_SCHEMA, INPUT_TYPES,
-  ARROW_DIRS, BLOCKS_VARIANTS, BLOCK_CELL_TONES, ICON_TONES, MEDIA_ASPECT_RATIOS, MESH_SHAPES, PLOT_KINDS, PROGRESS_VARIANTS, ROW_JUSTIFY, TABLE_CELL_TYPES, TEXT_ALIGNS, TEXT_SIZES, TEXT_TONES,
+  ARROW_DIRS, BLOCKS_VARIANTS, BLOCK_CELL_TONES, CALC_INPUT_KINDS, ICON_TONES, MEDIA_ASPECT_RATIOS, MESH_SHAPES, PLOT_KINDS, PROGRESS_VARIANTS, ROW_JUSTIFY, TABLE_CELL_TYPES, TEXT_ALIGNS, TEXT_SIZES, TEXT_TONES,
 } from './genui-runtime/schema.ts'
+import { calcFormulaProblem, calcNameProblem } from './calc-engine.ts'
 import type { ComponentFieldKind, ComponentRecordSchema, ComponentSchema } from './genui-runtime/schema.ts'
 import { normalizeGenuiSpec } from './genui-runtime/normalize.ts'
 import { diagnoseUnknownGenuiFields } from './genui-runtime/diagnostics.ts'
@@ -564,6 +565,7 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
       if (tabs === undefined) return null
       return { type: 'tabs', tabs }
     }
+    case 'calc': return repairCalc(v)
     case 'plot': {
       const series = repairPlotSeries(v.series, GENUI_LIMITS.maxPlotSeries)
       if (series === undefined) return null
@@ -910,6 +912,112 @@ function repairPlotSeries(v: unknown, cap: number): GenuiPlot['series'] | undefi
     out.push({ expr, ...opt('label', str(o.label, 128)), ...opt('color', color(o.color)), ...opt('kind', enu(o.kind, PLOT_KINDS)), ...opt('params', params.length > 0 ? params : undefined) })
   }
   return out
+}
+
+/** Bound for calc numbers: far beyond any household figure, still exact-ish in float64. */
+const CALC_NUMBER_BOUND = 1e12
+
+/**
+ * `calc`: inputs and outputs are data records, not nodes. Names that are not
+ * identifier-shaped, reserved, or already taken are dropped (a later formula
+ * referencing them then reads as a formula error, which validation reports).
+ * Over-long formulas are dropped rather than truncated: a cut expression
+ * would compute something the model never wrote.
+ */
+function repairCalc(v: Record<string, unknown>): GenuiNode | null {
+  if (!Array.isArray(v.inputs) || !Array.isArray(v.outputs)) return null
+  const taken = new Set<string>()
+  const inputs = v.inputs.slice(0, GENUI_LIMITS.maxCalcInputs).flatMap((entry) => {
+    const rec = obj(entry)
+    const name = rec === undefined ? undefined : str(rec.name, 32)
+    if (rec === undefined || name === undefined || calcNameProblem(name) !== null || taken.has(name)) return []
+    taken.add(name)
+    const kind = enu(rec.kind, CALC_INPUT_KINDS)
+    let min = num(rec.min, -CALC_NUMBER_BOUND, CALC_NUMBER_BOUND)
+    let max = num(rec.max, -CALC_NUMBER_BOUND, CALC_NUMBER_BOUND)
+    if (min !== undefined && max !== undefined && min > max) [min, max] = [max, min]
+    let value = num(rec.value, -CALC_NUMBER_BOUND, CALC_NUMBER_BOUND)
+    if (kind === 'slider') {
+      // A range control needs both ends; derive them around the given value.
+      const anchor = value ?? min ?? max ?? 0
+      min ??= Math.min(0, anchor)
+      max ??= Math.max(min + 100, anchor)
+      if (max <= min) max = min + 1
+    }
+    if (value !== undefined) {
+      if (min !== undefined) value = Math.max(min, value)
+      if (max !== undefined) value = Math.min(max, value)
+    }
+    return [{
+      name,
+      ...opt('label', str(rec.label, GENUI_LIMITS.maxString)),
+      ...opt('value', value),
+      ...opt('min', min),
+      ...opt('max', max),
+      ...opt('step', num(rec.step, 1e-9, CALC_NUMBER_BOUND)),
+      ...opt('kind', kind),
+      ...opt('prefix', str(rec.prefix, 16)),
+      ...opt('unit', str(rec.unit, 16)),
+    }]
+  })
+  const outputs = v.outputs.slice(0, GENUI_LIMITS.maxCalcOutputs).flatMap((entry) => {
+    const rec = obj(entry)
+    if (rec === undefined) return []
+    const label = str(rec.label, GENUI_LIMITS.maxString)
+    const expr = typeof rec.expr === 'string' && rec.expr.length <= GENUI_LIMITS.maxCalcExpr ? rec.expr : undefined
+    if (label === undefined || expr === undefined) return []
+    let name = str(rec.name, 32)
+    if (name !== undefined && (calcNameProblem(name) !== null || taken.has(name))) name = undefined
+    if (name !== undefined) taken.add(name)
+    return [{
+      label, expr,
+      ...opt('name', name),
+      ...opt('decimals', int(rec.decimals, 0, 10)),
+      ...opt('prefix', str(rec.prefix, 16)),
+      ...opt('unit', str(rec.unit, 16)),
+      ...opt('primary', rec.primary === true ? true : undefined),
+    }]
+  })
+  if (inputs.length === 0 || outputs.length === 0) return null
+  return {
+    type: 'calc', inputs, outputs,
+    ...opt('title', str(v.title, GENUI_LIMITS.maxString)),
+    ...opt('caption', str(v.caption, GENUI_LIMITS.maxString)),
+    ...opt('id', str(v.id, 64)),
+  }
+}
+
+/** `calc` semantics the record schemas cannot express: names, scope, compilation. */
+function validateCalcNode(v: Record<string, unknown>, at: string, errors: string[]): void {
+  if (!Array.isArray(v.inputs) || !Array.isArray(v.outputs)) return
+  if (v.inputs.length === 0) errors.push(`${at}.inputs must contain at least one input`)
+  if (v.outputs.length === 0) errors.push(`${at}.outputs must contain at least one output`)
+  if (v.inputs.length > GENUI_LIMITS.maxCalcInputs) errors.push(`${at}.inputs: at most ${GENUI_LIMITS.maxCalcInputs} inputs`)
+  if (v.outputs.length > GENUI_LIMITS.maxCalcOutputs) errors.push(`${at}.outputs: at most ${GENUI_LIMITS.maxCalcOutputs} outputs`)
+  const scope: Record<string, number> = {}
+  const declare = (name: unknown, path: string): void => {
+    if (typeof name !== 'string') return
+    const problem = calcNameProblem(name)
+    if (problem !== null) errors.push(`${path}: ${problem}`)
+    else if (Object.hasOwn(scope, name)) errors.push(`${path}: '${name}' is already declared`)
+    else scope[name] = 1
+  }
+  v.inputs.forEach((entry, i) => {
+    const rec = obj(entry)
+    if (rec !== undefined) declare(rec.name, `${at}.inputs[${i}].name`)
+  })
+  v.outputs.forEach((entry, i) => {
+    const rec = obj(entry)
+    if (rec === undefined || typeof rec.expr !== 'string') return
+    if (rec.expr.length > GENUI_LIMITS.maxCalcExpr) {
+      errors.push(`${at}.outputs[${i}].expr: formula longer than ${GENUI_LIMITS.maxCalcExpr} characters`)
+    } else {
+      // Scope is the inputs plus EARLIER named outputs: forward references fail here.
+      const problem = calcFormulaProblem(rec.expr, scope)
+      if (problem !== null) errors.push(`${at}.outputs[${i}].expr: ${problem}`)
+    }
+    if (rec.name !== undefined) declare(rec.name, `${at}.outputs[${i}].name`)
+  })
 }
 
 function repairSteps(v: unknown): Array<{ title: string; desc?: string }> | undefined {
@@ -1993,6 +2101,10 @@ function validateNode(value: unknown, depth: number, at: string, errors: string[
     }
     case 'plot':
       if (!Array.isArray(v.series)) errors.push(`${at}: type 'plot' requires series (array)`)
+      break
+    case 'calc':
+      // Required arrays and record shapes come from the registry check below.
+      validateCalcNode(v, at, errors)
       break
     case 'callout':
       if (typeof v.content !== 'string') errors.push(`${at}: type 'callout' requires content (string)`)

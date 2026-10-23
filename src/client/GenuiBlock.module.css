@@ -1690,6 +1690,105 @@ img.mediaPlayer { aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsl
 .mermaidErr { color: var(--dsw-alias-state-error-primary, #ff6b6b); font-size: var(--dsl-g-font-meta); }
 .mermaidHint { color: var(--dsw-alias-label-tertiary); font-size: var(--dsl-g-font-meta); }
 
+/* ---------- calc（本地公式计算器） ---------- */
+
+/* One surface like a card: inputs on top, a hairline, then results. The
+   headline figure reuses the stat scale so a calculator's answer reads as the
+   block's focal number; secondary results are quiet label/value rows. */
+.calc {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsl-g-gap-md);
+  padding: var(--dsl-g-gap-lg);
+  background: var(--dsl-g-surface);
+  border: 1px solid var(--dsl-g-border-surface);
+  border-radius: var(--dsl-g-radius-surface);
+  min-width: 0;
+}
+.calcTitle { font-size: var(--dsl-g-font-h3); font-weight: 650; letter-spacing: -0.01em; color: var(--dsw-alias-label-secondary); }
+.calcInputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: var(--dsl-g-gap-md) var(--dsl-g-gap-lg);
+}
+.calcField { display: flex; flex-direction: column; gap: var(--dsl-g-gap-xs); min-width: 0; }
+.calcFieldLabel { font-size: var(--dsl-g-font-meta); color: var(--dsw-alias-label-tertiary); }
+.calcControl {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 12px;
+  background: var(--dsl-g-surface);
+  border: 1px solid var(--dsl-g-border-surface);
+  border-radius: var(--dsl-g-radius-control);
+  transition: border-color var(--dsl-g-dur-fast) var(--dsl-g-ease-out), box-shadow var(--dsl-g-dur-fast) var(--dsl-g-ease-out);
+}
+.calcControl:focus-within {
+  border-color: var(--dsl-g-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsl-g-accent) var(--dsl-g-tint-strong), transparent);
+}
+.calcControl[data-invalid] { border-color: var(--dsw-alias-state-error-primary, #ff6b6b); }
+.calcInput {
+  flex: 1;
+  min-width: 0;
+  padding: 8px 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--dsw-alias-label-primary);
+  font: inherit;
+  font-size: var(--dsl-g-font-title);
+  font-variant-numeric: tabular-nums;
+}
+.calcAffix { color: var(--dsw-alias-label-tertiary); font-size: var(--dsl-g-font-meta); white-space: nowrap; }
+.calcSliderHead { display: flex; align-items: baseline; justify-content: space-between; gap: var(--dsl-g-gap-sm); }
+.calcSliderValue { font-size: var(--dsl-g-font-title); font-weight: 600; color: var(--dsw-alias-label-primary); font-variant-numeric: tabular-nums; }
+.calcHint { font-size: var(--dsl-g-font-meta); color: var(--dsw-alias-state-error-primary, #ff6b6b); }
+.calcResults {
+  display: flex;
+  flex-direction: column;
+  gap: var(--dsl-g-gap-sm);
+  padding-top: var(--dsl-g-gap-md);
+  border-top: 1px solid var(--dsl-g-border);
+}
+.calcHeadlines { display: flex; flex-wrap: wrap; gap: var(--dsl-g-gap-sm) var(--dsl-g-gap-xl); }
+.calcHeadline { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.calcHeadlineLabel { font-size: var(--dsl-g-font-meta); color: var(--dsw-alias-label-tertiary); }
+.calcHeadlineValue {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-size: var(--dsl-g-font-stat);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  color: var(--dsw-alias-label-primary);
+  overflow-wrap: anywhere;
+}
+.calcHeadlineValue .calcAffix { font-size: 0.5em; font-weight: 600; letter-spacing: 0; }
+.calcNumber { font-variant-numeric: tabular-nums; }
+.calcRows { margin: 0; display: flex; flex-direction: column; }
+.calcRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--dsl-g-gap-md);
+  padding: 6px 0;
+  font-size: var(--dsl-g-font-title);
+}
+.calcRow + .calcRow { border-top: 1px solid var(--dsl-g-border); }
+.calcRowLabel { color: var(--dsw-alias-label-secondary); }
+.calcRowValue {
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  text-align: right;
+}
+.calcCaption { font-size: var(--dsl-g-font-meta); line-height: 1.55; color: var(--dsw-alias-label-secondary); }
+
 /* ---------- scene3d ---------- */
 
 .scene3dWrap { display: flex; flex-direction: column; gap: var(--dsl-g-gap-sm); }

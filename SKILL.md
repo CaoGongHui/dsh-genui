@@ -102,6 +102,7 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 - tabs: `{"type":"tabs","tabs":[{"label":"...","items":[...]}]}` — 空 tab 可以省略 `items`，会按空数组处理
 - accordion: `{"type":"accordion","items":[{"title":"...","items":[...]}]}`
 - copy: `{"type":"copy","label":"<user-language action>","text":"<user-language text>"}`
+- calc: `{"type":"calc","title":"...","inputs":[{"name":"bill","label":"...","value":300,"min":0,"prefix":"¥"},{"name":"people","label":"...","value":4,"min":1,"kind":"slider","max":20}],"outputs":[{"label":"...","expr":"bill / people","decimals":2,"prefix":"¥"}],"caption":"..."?,"id":"calc-id"?}` — **本地公式计算器**：用户改任一输入，所有结果**当场重算，零模型往返**（分账、复利、贷款、换算、报价这类「输入几个数→得出结果」的工具用它，不要再发 action 让模型算）。`inputs[].name` 是公式里的变量名（字母/数字/`_`，不能叫 `sin`/`pi`/`e` 等函数或常量名）；`kind`: `number`（输入框，默认）或 `slider`（滑块，配 `min`/`max`）。`outputs[].expr` 只能引用输入名和**排在前面**的带 `name` 的结果（如 `{"name":"tip","expr":"bill*rate/100"}` 之后可写 `bill + tip`）。公式支持 `+ - * / ^`、括号、`< <= > >= == !=`（得 1/0）、`sqrt abs floor ceil min max pow ln log exp`、`round(v, 位数)`、`if(条件, 是, 否)`、`clamp(v, 下限, 上限)`、常量 `pi e`。**百分比写成 `/100`：`%` 是取余**。`decimals` 固定小数位（缺省最多 2 位），`prefix`/`unit` 是币种和单位；`primary:true` 标出主结果（大号数字），都不标时最后一个结果作主数字。公式写错、引用未声明的名字时整块会被拒绝并报出位置，先用 `validate_dsh_ui` 验。带 `id` 时输入值刷新后保留，并以 `id.name` 进入兄弟 submit 的 `fields`
 
 **状态持久化（v2.7）**：radio 答案、checkbox 分组选择、交卷锁定、输入值按「会话 + 内容指纹」自动保存——用户刷新页面/重开会话，同一块 UI 的状态原样恢复；你重渲染**相同内容**会保留用户状态，渲染**新内容**（换题等）自动从头开始。
 
@@ -145,6 +146,7 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 | 两个方案 / 选项对比 | `table`、`tabs`、`diff` |
 | 教学 / 自测 / 判断题 | `quiz` |
 | 数学函数 / 曲线关系 | `plot`（可带参数滑块、动画） |
+| 让用户自己算：分账、复利、贷款、换算、报价、预算 | `calc`（输入一改结果当场重算，不回模型） |
 | 需要用户操作 / 筛选 / 反馈 | `button`、`input`、`select`、`checkbox`、`radio`、`switch`、`tabs` |
 | 3D 物体 / 空间布局 | `scene3d` |
 
@@ -341,6 +343,22 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 ```
 
 何时不用：单一知识点用单个 `radio`（自带本地判卷）或 `quiz` 组件，不需要 submit 组卷；题目多于 5 个拆成多条回答分批发。
+
+### 计算器页（让用户自己算的默认结构）
+
+适用：答案取决于用户自己的数字——分账、复利、月供、单位换算、报价。给出能算的工具，而不是替某一组数字算一次。
+
+```json dsh-ui
+{"items":[{"type":"calc","title":"<user-language title>","inputs":[{"name":"bill","label":"<user-language label>","value":360,"min":0,"prefix":"¥"},{"name":"tipRate","label":"<user-language label>","value":10,"min":0,"max":30,"kind":"slider","unit":"%"},{"name":"people","label":"<user-language label>","value":4,"min":1,"max":20,"kind":"slider"}],"outputs":[{"name":"tip","label":"<user-language label>","expr":"bill * tipRate / 100","decimals":2,"prefix":"¥"},{"name":"total","label":"<user-language label>","expr":"bill + tip","decimals":2,"prefix":"¥"},{"label":"<user-language label>","expr":"total / people","decimals":2,"prefix":"¥","primary":true}],"caption":"<user-language text>"}]}
+```
+
+反例（百分号会被当成取余、公式无法编译，整块被拒绝，所以别抄）：
+
+```json dsh-ui-bad
+{"items":[{"type":"calc","inputs":[{"name":"bill","value":360}],"outputs":[{"label":"tip","expr":"bill * 10%"}]}]}
+```
+
+何时不用：只有一组固定数字、用户不会改输入时，直接写结论或 `stat`；需要模型参与判断（如推荐方案）的仍用表单 + `submit`。
 
 ## 使用规则
 

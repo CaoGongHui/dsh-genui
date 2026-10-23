@@ -67,6 +67,7 @@ export type GenuiNode = (
   | GenuiIcon
   | GenuiBlocks
   | GenuiArrow
+  | GenuiCalc
 ) & GenuiLayoutHints
 
   | GenuiEChart
@@ -506,6 +507,49 @@ export interface GenuiPlot {
   yMin?: number
   yMax?: number
   title?: string
+}
+
+/** One calculator input: a named number the formulas reference. */
+export interface GenuiCalcInput {
+  /** Variable name: letters/digits/`_`, not a math function or constant. */
+  name: string
+  label?: string
+  /** Initial value (defaults to `min`, then 0). */
+  value?: number
+  min?: number
+  max?: number
+  step?: number
+  /** `number` (typed field, default) or `slider` (range + live readout). */
+  kind?: 'number' | 'slider'
+  prefix?: string
+  unit?: string
+}
+
+/** One calculator result, recomputed locally whenever an input changes. */
+export interface GenuiCalcOutput {
+  label: string
+  /** SafeMath expression over input names and earlier output names. */
+  expr: string
+  /** Lets later outputs reference this result. */
+  name?: string
+  /** Fixed decimal places; omitted = up to 2. */
+  decimals?: number
+  prefix?: string
+  unit?: string
+  /** Render as the headline figure. */
+  primary?: boolean
+}
+
+/** Local formula calculator: inputs → outputs with no model round trip. */
+export interface GenuiCalc {
+  type: 'calc'
+  title?: string
+  inputs: GenuiCalcInput[]
+  outputs: GenuiCalcOutput[]
+  /** Footnote under the results (assumptions, sources). */
+  caption?: string
+  /** Persist inputs and expose them to a sibling submit as `${id}.${name}`. */
+  id?: string
 }
 
 export interface GenuiCallout {

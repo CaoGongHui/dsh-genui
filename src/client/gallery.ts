@@ -140,6 +140,15 @@ export const gallerySpec: GenuiSpec = {
       ] },
       { expr: '0.8*cos(x)', label: 'cos', color: '#3ecf8e' },
     ] },
+    { type: 'calc', title: '聚餐分账（改数字即时重算）', inputs: [
+      { name: 'bill', label: '账单', value: 360, min: 0, prefix: '¥' },
+      { name: 'tipRate', label: '小费比例', value: 10, min: 0, max: 30, kind: 'slider', unit: '%' },
+      { name: 'people', label: '人数', value: 4, min: 1, max: 20, kind: 'slider' },
+    ], outputs: [
+      { name: 'tip', label: '小费', expr: 'bill * tipRate / 100', decimals: 2, prefix: '¥' },
+      { name: 'total', label: '合计', expr: 'bill + tip', decimals: 2, prefix: '¥' },
+      { label: '每人', expr: 'total / people', decimals: 2, prefix: '¥', primary: true },
+    ], caption: '公式在本地计算，不经过模型。' },
     { type: 'scene3d', title: '几何演示', ambient: 1, meshes: [
       { shape: 'box', color: '#4f8ef7', position: [-1.4, 0, 0], rotation: [0.5, 0.8, 0] },
       { shape: 'sphere', color: '#3ecf8e', position: [0, 0, 0] },

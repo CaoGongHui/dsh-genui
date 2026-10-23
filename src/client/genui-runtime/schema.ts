@@ -102,6 +102,8 @@ export const BLOCKS_VARIANTS = ['fill', 'outline', 'plain'] as const
 export const BLOCK_CELL_TONES = ['accent', 'success', 'warning', 'danger', 'muted'] as const
 /** Icon tones: the four semantic roles plus neutral/muted text colours. */
 export const ICON_TONES = ['default', 'muted', 'info', 'success', 'warning', 'danger'] as const
+/** Calculator input controls. */
+export const CALC_INPUT_KINDS = ['number', 'slider'] as const
 /** Hero cover tones. */
 export const HERO_TONES = ['accent', 'success', 'warning', 'danger'] as const
 /** Table cell renderers (`table.types`, one entry per column). */
@@ -184,6 +186,15 @@ const plotParamSchema = recordSchema(['name', 'value'], {
 const plotSeriesSchema = recordSchema(['expr'], {
   expr: 'string', label: 'string', color: 'string', kind: 'string', params: 'array',
 }, { params: plotParamSchema }, { kind: PLOT_KINDS })
+// `calc` records. Models reach for spreadsheet words (`id`/`var` for the
+// variable name, `formula` for the expression), so those alias in.
+const calcInputSchema = recordSchema(['name'], {
+  name: 'string', label: 'string', value: 'number', min: 'number', max: 'number', step: 'number',
+  kind: 'string', prefix: 'string', unit: 'string',
+}, {}, { kind: CALC_INPUT_KINDS }, { id: 'name', var: 'name', default: 'value' })
+const calcOutputSchema = recordSchema(['label', 'expr'], {
+  label: 'string', expr: 'string', name: 'string', decimals: 'number', prefix: 'string', unit: 'string', primary: 'boolean',
+}, {}, {}, { formula: 'expr', expression: 'expr', title: 'label' })
 const sceneMeshSchema = recordSchema(['shape'], {
   shape: 'string', color: 'string', position: 'array', rotation: 'array', scale: 'unknown', size: 'unknown',
 }, {}, { shape: MESH_SHAPES })
@@ -281,6 +292,12 @@ export const COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   badge: schema(['label'], { ...nodeFields, label: 'string', tone: 'string', icon: 'string' }, { text: 'label', value: 'label' }, { enums: { tone: BADGE_TONES } }),
   breadcrumb: schema(['items'], { ...nodeFields, items: 'array' }),
   button: schema(['label'], { ...nodeFields, label: 'string', tone: 'string', full: 'boolean', small: 'boolean', icon: 'string', action: 'string' }, {}, { enums: { tone: BUTTON_TONES } }),
+  // Local formula calculator (computed interactivity without a model round
+  // trip). Formulas are SafeMath strict-mode expressions; validateNode checks
+  // names, scope, and compilation.
+  calc: schema(['inputs', 'outputs'], {
+    ...nodeFields, title: 'string', inputs: 'array', outputs: 'array', caption: 'string', id: 'string',
+  }, { fields: 'inputs', results: 'outputs' }, { nested: { inputs: calcInputSchema, outputs: calcOutputSchema } }),
   // `text`/`body`/`desc` are the model's default names for "the callout's
   // prose": a callout missing `content` is dropped by repair, which takes the
   // WHOLE fence down with it (issue: dsh-ui 围栏字段名). Adopt them as aliases.

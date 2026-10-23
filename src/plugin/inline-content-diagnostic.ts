@@ -166,6 +166,12 @@ export function collectInlineContentWarnings(spec: GenuiSpec): InlineContentWarn
       case 'svg':
         check(node.title, `${path}.title`)
         break
+      case 'calc':
+        check(node.title, `${path}.title`)
+        check(node.caption, `${path}.caption`)
+        node.inputs.forEach((input, i) => check(input.label, `${path}.inputs[${i}].label`))
+        node.outputs.forEach((output, i) => check(output.label, `${path}.outputs[${i}].label`))
+        break
       case 'copy':
         check(node.label, `${path}.label`)
         break

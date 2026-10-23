@@ -9,19 +9,29 @@
  * cannot reach globals, prototypes, or side effects.
  *
  * Supported grammar:
+ *   compare := expr (('<' | '<=' | '>' | '>=' | '==' | '!=') expr)?   → 1 or 0
  *   expr    := term (('+' | '-') term)*
  *   term    := unary (('*' | '/' | '%') unary)*
  *   unary   := ('-' | '+') unary | power
  *   power   := atom ('^' atom)?
- *   atom    := number | variable | constant | func '(' expr ')' | '(' expr ')'
+ *   atom    := number | variable | constant | func '(' compare (',' compare)* ')' | '(' compare ')'
  *   variable: 'x' (and any single-letter variable present in vars)
  *   constant: 'pi' | 'e' | 'tau'
- *   func    : sin cos tan asin acos atan sqrt cbrt exp log ln abs floor ceil round min max pow
+ *   func    : sin cos tan asin acos atan sqrt cbrt exp log ln abs floor ceil
+ *             round(v[, digits]) min max pow if(cond, then, else) clamp(v, lo, hi)
+ *
+ * Strict mode (the `calc` component) changes identifier resolution only:
+ * every name must be a declared variable, a constant, or a call to a listed
+ * function with the right number of arguments. `x` is an ordinary variable
+ * there, and the plot conveniences (sampling `x`, undeclared single letters
+ * defaulting to 1) are off, so a typo is a parse error instead of a silent 1.
  */
 
 export interface SafeMathOptions {
   /** Variable values; only names present here may be referenced as variables. */
   vars?: Record<string, number>
+  /** Calculator mode: reject undeclared identifiers and wrong call arity. */
+  strict?: boolean
 }
 
 const CONSTANTS: Record<string, number> = {
@@ -30,14 +40,56 @@ const CONSTANTS: Record<string, number> = {
   tau: Math.PI * 2,
 }
 
+/** Move the decimal point by `by` places through the number's own decimal
+ * string, so 1.005 shifts to exactly 100.5 (`1.005 * 100` is 100.49999…). */
+function shiftDecimal(value: number, by: number): number {
+  const [mantissa, exponent = '0'] = String(value).split('e')
+  return Number(`${mantissa}e${Number(exponent) + by}`)
+}
+
+/** `round(v, digits)`: half-away-from-zero at `digits` decimals (0–10);
+ * `round(v)` keeps Math.round. */
+function roundTo(value: number, digits?: number): number {
+  if (digits === undefined) return Math.round(value)
+  if (!Number.isFinite(value) || !Number.isFinite(digits)) return Number.NaN
+  const d = Math.max(0, Math.min(10, Math.trunc(digits)))
+  return Math.sign(value) * shiftDecimal(Math.round(shiftDecimal(Math.abs(value), d)), -d)
+}
+
 const FUNCTIONS: Record<string, (...args: number[]) => number> = {
   sin: Math.sin, cos: Math.cos, tan: Math.tan,
   asin: Math.asin, acos: Math.acos, atan: Math.atan,
   sqrt: Math.sqrt, cbrt: Math.cbrt,
   exp: Math.exp, log: Math.log10, ln: Math.log,
-  abs: Math.abs, floor: Math.floor, ceil: Math.ceil, round: Math.round,
+  abs: Math.abs, floor: Math.floor, ceil: Math.ceil,
+  round: (v, d) => roundTo(v, d),
   min: Math.min, max: Math.max,
   pow: (a, b) => Math.pow(a, b),
+  // A NaN condition means "unknown input": propagate instead of picking a branch.
+  if: (c, a, b) => (Number.isNaN(c) ? Number.NaN : c !== 0 ? a : b),
+  clamp: (v, lo, hi) => Math.min(hi, Math.max(lo, v)),
+}
+
+/** [min, max] argument counts, enforced in strict mode. Plot expressions keep
+ * the historical lenient arity (an extra argument there was always ignored). */
+const ARITY: Record<string, readonly [number, number]> = {
+  sin: [1, 1], cos: [1, 1], tan: [1, 1], asin: [1, 1], acos: [1, 1], atan: [1, 1],
+  sqrt: [1, 1], cbrt: [1, 1], exp: [1, 1], log: [1, 1], ln: [1, 1],
+  abs: [1, 1], floor: [1, 1], ceil: [1, 1], round: [1, 2],
+  min: [1, 64], max: [1, 64], pow: [2, 2], if: [3, 3], clamp: [3, 3],
+}
+
+/** Names a variable may never take: they resolve to a constant or function. */
+export const SAFE_MATH_RESERVED: ReadonlySet<string> = new Set([...Object.keys(CONSTANTS), ...Object.keys(FUNCTIONS)])
+
+type Comparator = (a: number, b: number) => boolean
+const COMPARATORS: Record<string, Comparator> = {
+  '<': (a, b) => a < b,
+  '<=': (a, b) => a <= b,
+  '>': (a, b) => a > b,
+  '>=': (a, b) => a >= b,
+  '==': (a, b) => a === b,
+  '!=': (a, b) => a !== b,
 }
 
 class ParseError extends Error {
@@ -48,13 +100,31 @@ class ParseError extends Error {
 
 class SafeMathParser {
   private i = 0
-  constructor(private readonly src: string, private readonly vars: Record<string, number>) {}
+  constructor(
+    private readonly src: string,
+    private readonly vars: Record<string, number>,
+    private readonly strict = false,
+  ) {}
 
   parse(): (x: number) => number {
-    const node = this.parseExpr()
+    const node = this.parseCompare()
     this.skipWs()
     if (this.i < this.src.length) throw new ParseError('unexpected trailing input', this.i)
     return this.evalNode(node)
+  }
+
+  /** Lowest precedence: one optional comparison, yielding 1 (true) or 0. */
+  private parseCompare(): number | ((x: number) => number) {
+    const left = this.parseExpr()
+    this.skipWs()
+    const two = this.src.slice(this.i, this.i + 2)
+    const one = this.peek()
+    const op = Object.hasOwn(COMPARATORS, two) ? two : one === '<' || one === '>' ? one : undefined
+    if (op === undefined) return left
+    this.i += op.length
+    const right = this.parseExpr()
+    const compare = COMPARATORS[op]!
+    return (x) => (compare(this.asNum(left, x), this.asNum(right, x)) ? 1 : 0)
   }
 
   private evalNode(node: number | ((x: number) => number)): (x: number) => number {
@@ -126,7 +196,7 @@ class SafeMathParser {
     const c = this.char()
     if (c === '(') {
       this.i++
-      const inner = this.parseExpr()
+      const inner = this.parseCompare()
       this.skipWs()
       if (this.peek() !== ')') throw new ParseError('expected )', this.i)
       this.i++
@@ -180,8 +250,9 @@ class SafeMathParser {
     const name = this.src.slice(start, this.i)
     this.skipWs()
     if (this.peek() === '(') {
-      // Function call.
-      const fn = FUNCTIONS[name]
+      // Function call. Own-property lookup: FUNCTIONS is a plain object, so
+      // `constructor(1)` would otherwise resolve to Object.prototype.constructor.
+      const fn = Object.hasOwn(FUNCTIONS, name) ? FUNCTIONS[name] : undefined
       if (fn === undefined) throw new ParseError(`unknown function '${name}'`, start)
       this.i++
       const args: Array<number | ((x: number) => number)> = []
@@ -190,7 +261,7 @@ class SafeMathParser {
         this.i++
       } else {
         for (;;) {
-          args.push(this.parseExpr())
+          args.push(this.parseCompare())
           this.skipWs()
           const sep = this.peek()
           if (sep === ',') { this.i++; continue }
@@ -198,12 +269,19 @@ class SafeMathParser {
           throw new ParseError('expected , or ) in call', this.i)
         }
       }
+      if (this.strict) {
+        const [least, most] = ARITY[name] ?? [0, 64]
+        if (args.length < least || args.length > most) {
+          const want = least === most ? `${least}` : `${least}–${most}`
+          throw new ParseError(`'${name}' takes ${want} argument(s), got ${args.length}`, start)
+        }
+      }
       return (x) => fn(...args.map(a => this.asNum(a, x)))
     }
     // Own-property checks only: `in` would match inherited members like
     // `constructor`/`toString` on the vars object.
     if (Object.hasOwn(CONSTANTS, name)) return CONSTANTS[name]!
-    if (name === 'x') {
+    if (!this.strict && name === 'x') {
       // The sampling variable resolves against the evaluation argument.
       return (value: number) => value
     }
@@ -218,7 +296,8 @@ class SafeMathParser {
     // like "a*sin(b*x)" without a params declaration still renders instead
     // of failing as "unknown identifier". This is safe: only [a-z] matches,
     // so injection names (constructor, window, process…) still parse-error.
-    if (/^[a-z]$/.test(name)) return () => 1
+    // A calculator must not invent values, so strict mode refuses instead.
+    if (!this.strict && /^[a-z]$/.test(name)) return () => 1
     throw new ParseError(`unknown identifier '${name}'`, start)
   }
 
@@ -259,12 +338,31 @@ class SafeMathParser {
  */
 export function compileMathExpr(expr: string, options: SafeMathOptions = {}): ((x: number) => number) | null {
   try {
-    // `x` is the sampling variable and must never be shadowed by a param.
-    const vars: Record<string, number> = { ...options.vars }
-    delete vars.x
-    return new SafeMathParser(expr, vars).parse()
+    return parserFor(expr, options).parse()
   } catch {
     return null
+  }
+}
+
+function parserFor(expr: string, options: SafeMathOptions): SafeMathParser {
+  const vars: Record<string, number> = { ...options.vars }
+  // Plot: `x` is the sampling variable and must never be shadowed by a param.
+  // Strict (calc): `x` is an ordinary declared name.
+  if (options.strict !== true) delete vars.x
+  return new SafeMathParser(expr, vars, options.strict === true)
+}
+
+/**
+ * Explain why an expression does not compile.
+ * @returns the parse error message (with its character position), or null
+ *   when the expression is valid under `options`.
+ */
+export function checkMathExpr(expr: string, options: SafeMathOptions = {}): string | null {
+  try {
+    parserFor(expr, options).parse()
+    return null
+  } catch (error) {
+    return error instanceof Error ? error.message : 'SafeMath parse error'
   }
 }
 

@@ -28,6 +28,7 @@ import { ImageNode } from './image.tsx'
 import { SvgNode } from './svg.tsx'
 import { IconNode } from './icon.tsx'
 import { BlocksNode } from './blocks.tsx'
+import { CalcNode } from './calc.tsx'
 
 import { EChartNode } from '../EChartNode.tsx'
 
@@ -496,6 +497,7 @@ export function renderNode(
       )
     }
     case 'plot': return <PlotNode key={key} plot={node} />
+    case 'calc': return <CalcNode key={key} node={node} answers={answers} />
     case 'callout': return <CalloutNode key={key} node={node} />
     case 'steps': return <StepsNode key={key} steps={node} />
     case 'keyvalue': return <KeyValueNode key={key} node={node} />
