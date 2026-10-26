@@ -259,6 +259,9 @@ export const EN = {
   'ach.template-1.desc': 'Tried a template from the template center.',
 
   // ------------------------------------------------- primitive chrome
+  'label.copyViewText': 'View text',
+  'label.copyHideText': 'Hide text',
+  'label.copyPreviewTruncated': 'Preview truncated. Copy still includes the component’s full text.',
   'label.copy': 'Copy',
   /** CodeBlock's post-copy button label. */
   'label.copied': 'Copied',
@@ -301,6 +304,17 @@ export const EN = {
   'block.audioError': 'Audio cannot be played',
   'block.video': 'Video',
   'block.videoError': 'Video cannot be played',
+  'block.carouselPosition': 'Card {current} of {total}',
+  'block.carousel': 'Carousel',
+  'block.carouselPrevious': 'Previous cards',
+  'block.carouselNext': 'Next cards',
+  'block.galleryEmpty': 'No items to display',
+  'block.imageGroup': 'Image gallery',
+  'block.imageOpen': 'Enlarge {name}',
+  'block.imagePrevious': 'Previous image',
+  'block.imageNext': 'Next image',
+  'block.imageClose': 'Close image viewer',
+  'block.imagePosition': 'Image {current} of {total}',
   'block.image': 'Image',
   'block.imageError': 'Image failed to load',
   'block.svgLabel': 'SVG diagram',
@@ -320,6 +334,7 @@ export const EN = {
   'block.yourAnswer': 'Your answer:',
   'block.correctAnswer': ' Correct answer:',
   'block.selectedCount': '{answered}/{total} answered',
+  'block.invalidNumber': 'Enter a valid decimal number',
   'block.target': 'Target {value}%',
   'block.chart.barsAria': 'Horizontal bar chart, {count} groups',
   'block.chart.barsSummary': 'Bar chart, {count} groups, max {max}',
@@ -328,6 +343,11 @@ export const EN = {
   'block.chart.donutSummary': 'Donut chart, {count} slices, total {total}',
   'block.chart.node': 'Point',
 
+  // ------------------------------------------------------ action prompt
+  'action.inline': '[genui-action] {action}. The user just triggered this action "{action}" in the interface. Carry it out using the component data, then reply with an updated dsh-ui fence.{payload}',
+  'action.panel': '[genui-action] {action}. The user just triggered this action "{action}" in the panel. Carry it out using the component data and emit a single panel:true dsh-ui fence that updates the panel, with at most a one-line confirmation in the reply (for example "Refreshed"). Do not explain, and do not emit an ordinary fence.{payload}',
+  'action.payload': ' Component data: {json}',
+
   // -------------------------------------------------------- error text
   'err.boundary.generic': 'this interface',
   'err.boundary.fence': 'this interface',
@@ -335,5 +355,5 @@ export const EN = {
   'err.fieldValidation': 'GenUI field validation failed: {errors}',
   'err.chartValidation': 'chart field validation failed: {errors}',
   'err.fenceKeptAsCode': '⚠️ dsh-ui {diagnostic} — the fence stays a code block; fix it and resend.',
-  'err.fenceParse': '⚠️ dsh-ui fence JSON failed to parse{diagnostic} — the fence stays a code block; ask the model to fix the JSON and resend.',
+  'err.fenceParse': '⚠️ dsh-ui fence JSON failed to parse {diagnostic} — the fence stays a code block; ask the model to fix the JSON and resend.',
 } as const

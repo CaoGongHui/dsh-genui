@@ -10,7 +10,10 @@ const hostRef = process.argv[2]
 assert.match(hostRef ?? '', /^dsh-v\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?$/, '需要明确的 DSH 发布标签')
 const version = hostRef.slice('dsh-v'.length)
 const pkg = JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8'))
-const dshPackages = Object.keys(pkg.peerDependencies).filter(name => name.startsWith('@deepseek-ai/dsh-'))
+const dshPackages = [...new Set([
+  ...Object.keys(pkg.peerDependencies),
+  ...Object.keys(pkg.devDependencies),
+])].filter(name => name.startsWith('@deepseek-ai/dsh-'))
 const checkRoot = await mkdtemp(join(tmpdir(), 'dsh-genui-host-api-'))
 
 try {
@@ -22,6 +25,7 @@ try {
   // e2e-auth 等测试按 cwd 相对路径读取 scripts/ 源码，隔离目录需要一并拷贝
   await cp(join(repoRoot, 'scripts'), join(checkRoot, 'scripts'), { recursive: true })
 
+  // 所有直接 DSH 依赖统一到目标版本，避免测试辅助包把另一版宿主混入检查。
   // pnpm 在隔离目录安装发布包，源码中的 import 由该目录的 node_modules 解析。
   // hostRuntimeClosure：发布宿主包在真实 App 内运行，部分 import 未在包内声明
   // （如 ui-primitives 直接 import clsx/shiki/simple-icons，client-store import
@@ -35,8 +39,7 @@ try {
   ]
   execFileSync('pnpm', ['add', '--save-dev', '--save-exact',
     ...dshPackages.map(name => `${name}@${version}`),
-    `@deepseek-ai/dsh-util-code-language@${version}`,
-    ...hostRuntimeClosure,
+    ...hostRuntimeClosure.map(name => `${name}@${pkg.devDependencies[name]}`),
   ], { cwd: checkRoot, stdio: 'inherit' })
   for (const name of dshPackages) {
     const installed = JSON.parse(await readFile(join(checkRoot, 'node_modules', name, 'package.json'), 'utf8'))

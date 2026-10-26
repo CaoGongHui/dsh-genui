@@ -25,6 +25,8 @@ import {
 } from './advanced.tsx'
 import { DiagramNode } from './diagram/index.tsx'
 import { ImageNode } from './image.tsx'
+import { CarouselNode } from './carousel.tsx'
+import { ImageGroupNode } from './image-group.tsx'
 import { SvgNode } from './svg.tsx'
 import { IconNode } from './icon.tsx'
 import { BlocksNode } from './blocks.tsx'
@@ -167,6 +169,7 @@ function listItemText(item: GenuiList['items'][number]): string {
 
 function boundField(answers: AnswersState | undefined, id: string | undefined): string | undefined {
   if (id === undefined) return undefined
+  if (answers?.fields === undefined || !Object.hasOwn(answers.fields, id)) return undefined
   const value = answers?.fields[id]
   return value === undefined || value === '' ? undefined : value
 }
@@ -177,6 +180,9 @@ export function renderNode(
   onAction: GenuiBlockProps['onAction'] | undefined,
   depth = 0,
   answers?: AnswersState,
+  // A structural occurrence, not node object identity: typed callers may reuse
+  // one node (or container) in several positions. Match walkGenuiNodes paths.
+  path = `items[${key}]`,
 ): ReactNode {
   // Depth guard: a pathological spec must never recurse past the limit
   // (stack overflow / DOM explosion). The fence path already repairs specs
@@ -206,7 +212,7 @@ export function renderNode(
           className={css.row + (node.wrap ? ` ${css.wrap}` : '')
             + (node.justify === undefined || node.justify === 'start' ? '' : ` ${css[`justify${node.justify[0]!.toUpperCase()}${node.justify.slice(1)}`] ?? ''}`)}
         >
-          {node.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers))}
+          {node.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers, `${path}.items[${i}]`))}
           {node.spacer && <div className={css.spacer} />}
         </div>
       )
@@ -218,10 +224,10 @@ export function renderNode(
           className={css.col}
           style={{
             ...(node.gap !== undefined ? { gap: `${node.gap}px` } : {}),
-            ...(node.width !== undefined ? { flex: `0 0 ${node.width}%`, width: `${node.width}%` } : {}),
+            ...(node.width !== undefined ? { flex: `0 1 ${node.width}%`, width: `${node.width}%` } : {}),
           }}
         >
-          {node.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers))}
+          {node.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers, `${path}.items[${i}]`))}
         </div>
       )
     }
@@ -231,7 +237,7 @@ export function renderNode(
           {/* `span` is the bento primitive: a child can occupy several columns,
               so one wide hero card can sit next to two narrow ones. */}
           {node.items.map((c, i) => {
-            const child = renderNode(c, i, onAction, depth + 1, answers)
+            const child = renderNode(c, i, onAction, depth + 1, answers, `${path}.items[${i}]`)
             const span = typeof c === 'object' && c !== null && typeof (c as { span?: unknown }).span === 'number'
               ? Math.max(1, Math.min(12, (c as { span: number }).span))
               : 1
@@ -261,7 +267,7 @@ export function renderNode(
         >
           {node.eyebrow !== undefined && <div className={css.cardEyebrow}>{renderInline(node.eyebrow)}</div>}
           {node.title !== undefined && <div className={css.cardTitle}>{renderInline(node.title)}</div>}
-          {node.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers))}
+          {node.items.map((c, i) => renderNode(c, i, onAction, depth + 1, answers, `${path}.items[${i}]`))}
         </div>
       )
     }
@@ -298,6 +304,11 @@ export function renderNode(
       }
       return <span key={key} className={css.linkText}>{renderInline(node.label, false)}</span>
     }
+    case 'carousel': return <CarouselNode key={key} node={node}>{
+      node.items.slice(0, GENUI_LIMITS.maxCarouselItems).map((child, index) =>
+        renderNode(child, index, onAction, depth + 1, answers, `${path}.items[${index}]`))
+    }</CarouselNode>
+    case 'image-group': return <ImageGroupNode key={key} node={node} />
     case 'image': return <ImageNode key={`${key}:${node.src}`} node={node} />
     case 'audio': return <AudioNode key={`${key}:${node.src}`} node={node} />
     case 'video': return <VideoNode key={`${key}:${node.src}`} node={node} />
@@ -421,16 +432,16 @@ export function renderNode(
       return <hr key={key} className={css.divider} />
     case 'list': {
       const bound = boundField(answers, node.filter)?.toLowerCase()
-      const all = node.items.slice(0, GENUI_LIMITS.maxListItems)
+      const all = node.items.slice(0, GENUI_LIMITS.maxListItems).map((item, index) => ({ item, index }))
       const items = bound === undefined
         ? all
-        : all.filter(item => listItemText(item).toLowerCase().includes(bound))
+        : all.filter(({ item }) => listItemText(item).toLowerCase().includes(bound))
       return (
         <div key={key} className={css.list}>
-          {items.map((item, i) => (
+          {items.map(({ item, index }, i) => (
             <div key={i} className={css.li}>
               {isListItemNode(item)
-                ? renderNode(item, i, onAction, depth + 1, answers)
+                ? renderNode(item, i, onAction, depth + 1, answers, `${path}.items[${index}]`)
                 : <><div className={css.liTitle}>{renderInline(typeof item === 'string' ? item : item.title)}</div>{typeof item !== 'string' && item.desc !== undefined && <div className={css.liDesc}>{renderInline(item.desc)}</div>}</>}
             </div>
           ))}
@@ -448,11 +459,11 @@ export function renderNode(
           // filtering never needs a model round trip.
           filterValue={boundField(answers, node.filter)}
           sortValue={boundField(answers, node.sortField)}
-          renderDetail={items => items.map((child, i) => renderNode(child, i, onAction, depth + 1, answers))}
+          renderDetail={(items, detailIndex) => items.map((child, i) => renderNode(child, i, onAction, depth + 1, answers, `${path}.details[${detailIndex}][${i}]`))}
         />
       )
     case 'chart': return <ChartNode key={key} chart={node} filterValue={boundField(answers, node.filter)} />
-    case 'tabs': return <TabsNode key={key} tabs={node} onAction={onAction} depth={depth + 1} answers={answers} />
+    case 'tabs': return <TabsNode key={key} tabs={node} onAction={onAction} depth={depth + 1} answers={answers} path={path} />
     case 'avatar': {
       return (
         <div key={key} className={css.avatar} style={{ background: node.color ?? avatarColor(node.name) }}>
@@ -507,8 +518,8 @@ export function renderNode(
     case 'switch': return <SwitchNode key={key} node={node} onAction={onAction} />
     case 'slider': return <SliderNode key={key} node={node} onAction={onAction} answers={answers} />
     case 'textarea': return <TextareaNode key={key} node={node} onAction={onAction} answers={answers} />
-    case 'accordion': return <AccordionNode key={key} node={node} onAction={onAction} depth={depth + 1} answers={answers} />
-    case 'copy': return <CopyNode key={key} node={node} />
+    case 'accordion': return <AccordionNode key={key} node={node} onAction={onAction} depth={depth + 1} answers={answers} path={path} />
+    case 'copy': return <CopyNode key={key} node={node} path={path} />
     case 'mermaid': return <MermaidNode key={key} node={node} />
     case 'svg': return <SvgNode key={key} node={node} />
     case 'scene3d': return <Scene3DNode key={key} node={node} />
