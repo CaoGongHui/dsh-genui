@@ -18,8 +18,11 @@ afterEach(() => {
   localStorage.clear()
 })
 
+// Calculator mode, as calc-engine compiles formulas.
+const CALC = { allowImplicitVariables: false, checkArity: true } as const
+
 const evalExpr = (expr: string, vars: Record<string, number> = {}): number => {
-  const fn = compileMathExpr(expr, { vars, strict: true })
+  const fn = compileMathExpr(expr, { ...CALC, vars })
   if (fn === null) throw new Error(`did not compile: ${expr}`)
   return fn(0)
 }
@@ -43,13 +46,13 @@ describe('SafeMath additions', () => {
   it('never resolves a function name through the prototype chain', () => {
     expect(compileMathExpr('constructor(1)')).toBeNull()
     expect(compileMathExpr('toString(1)')).toBeNull()
-    expect(compileMathExpr('valueOf()', { strict: true })).toBeNull()
+    expect(compileMathExpr('valueOf()', CALC)).toBeNull()
   })
 
   it('strict mode refuses undeclared names and wrong arity; plot mode keeps its conveniences', () => {
-    expect(checkMathExpr('a * x', { strict: true })).toMatch(/unknown identifier 'a'/)
-    expect(checkMathExpr('x + 1', { vars: { x: 2 }, strict: true })).toBeNull()
-    expect(checkMathExpr('pow(2)', { strict: true })).toMatch(/'pow' takes 2/)
+    expect(checkMathExpr('a * x', CALC)).toMatch(/unknown identifier 'a'/)
+    expect(checkMathExpr('x + 1', { ...CALC, vars: { x: 2 } })).toBeNull()
+    expect(checkMathExpr('pow(2)', CALC)).toMatch(/'pow' takes 2/)
     // Plot: implicit single-letter params default to 1, x samples, arity lenient.
     expect(compileMathExpr('a * x')?.(3)).toBe(3)
     expect(compileMathExpr('pow(2)')).not.toBeNull()

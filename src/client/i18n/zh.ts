@@ -257,6 +257,9 @@ export const ZH: Record<keyof typeof EN, string> = {
   'ach.template-1.desc': '从模板中心试用了一个模板。',
 
   // ------------------------------------------------- primitive chrome
+  'label.copyViewText': '查看文本',
+  'label.copyHideText': '收起文本',
+  'label.copyPreviewTruncated': '预览已截断，复制仍包含组件的完整文本。',
   'label.copy': '复制',
   'label.copied': '复制成功',
   'label.copiedDone': '已复制',
@@ -296,6 +299,17 @@ export const ZH: Record<keyof typeof EN, string> = {
   'block.audioError': '音频无法播放',
   'block.video': '视频',
   'block.videoError': '视频无法播放',
+  'block.carouselPosition': '第 {current} 张卡片，共 {total} 张',
+  'block.carousel': '轮播',
+  'block.carouselPrevious': '上一组卡片',
+  'block.carouselNext': '下一组卡片',
+  'block.galleryEmpty': '暂无可展示的内容',
+  'block.imageGroup': '图片组',
+  'block.imageOpen': '放大 {name}',
+  'block.imagePrevious': '上一张图片',
+  'block.imageNext': '下一张图片',
+  'block.imageClose': '关闭图片查看器',
+  'block.imagePosition': '第 {current} 张，共 {total} 张图片',
   'block.image': '图片',
   'block.imageError': '图片无法加载',
   'block.svgLabel': 'SVG 图形',
@@ -319,6 +333,7 @@ export const ZH: Record<keyof typeof EN, string> = {
   'block.yourAnswer': '你的答案：',
   'block.correctAnswer': ' 正确答案：',
   'block.selectedCount': '已选 {answered}/{total}',
+  'block.invalidNumber': '请输入有效的十进制数值',
   'block.target': '目标 {value}%',
   'block.chart.barsAria': '横向柱状图，{count} 组',
   'block.chart.barsSummary': '柱状图，{count} 组，最大 {max}',
@@ -327,6 +342,11 @@ export const ZH: Record<keyof typeof EN, string> = {
   'block.chart.donutSummary': '环形图，{count} 项，合计 {total}',
   'block.chart.node': '节点',
 
+  // ------------------------------------------------------ action prompt
+  'action.inline': '[genui-action] {action}。用户刚刚在界面中触发了动作 "{action}"，请根据组件数据执行相应操作，并用 dsh-ui 输出更新后的界面。{payload}',
+  'action.panel': '[genui-action] {action}。用户刚刚在面板中触发了动作 "{action}"，请根据组件数据执行相应操作，只输出一个 panel:true 的 dsh-ui 围栏来更新面板，回复文本至多一行 10 字以内的确认（如"已刷新"），不要解释、不要普通围栏。{payload}',
+  'action.payload': ' 组件数据: {json}',
+
   // -------------------------------------------------------- error text
   'err.boundary.generic': '此界面',
   'err.boundary.fence': '该界面',
@@ -334,5 +354,5 @@ export const ZH: Record<keyof typeof EN, string> = {
   'err.fieldValidation': 'GenUI 字段验证失败：{errors}',
   'err.chartValidation': 'chart 字段验证失败：{errors}',
   'err.fenceKeptAsCode': '⚠️ dsh-ui {diagnostic} —— 围栏保持为代码块；请修正后重发。',
-  'err.fenceParse': '⚠️ dsh-ui fence JSON 解析失败{diagnostic} —— 围栏保持为代码块；请让模型检查并修复 JSON 后重发。',
+  'err.fenceParse': '⚠️ dsh-ui fence JSON 解析失败 {diagnostic} —— 围栏保持为代码块；请让模型检查并修复 JSON 后重发。',
 }

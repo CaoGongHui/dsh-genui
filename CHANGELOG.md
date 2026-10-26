@@ -4,25 +4,38 @@
 
 ### 新增
 
+- 新增 `calc` 节点：本地公式计算器。`inputs`（输入框或滑块，带 `prefix`/`unit`/范围）+ `outputs`（公式、`decimals`、`primary` 主数字），用户改任一输入即在浏览器内重算，**不回模型**；后面的结果可引用前面带 `name` 的结果。公式走 SafeMath 严格模式：未声明的名字、函数参数个数不对、引用排在后面的结果都在校验阶段报错并给出位置，`10%` 这类写法附带「百分比写成 /100」提示。带 `id` 时输入值刷新保留，并以 `id.name` 进入兄弟 `submit` 的 `fields`。输入框接受全角数字与千分位；非法输入标红并显示「—」，失焦时按范围收拢。`SKILL.md` 新增「计算器页」范式与反例，画廊新增分账示例。
+- SafeMath 新增比较运算（`< <= > >= == !=`，得 1/0）、`if(条件, 是, 否)`、`clamp(v, 下限, 上限)` 与 `round(v, 位数)`（按十进制移位，`round(1.005, 2)` 得 1.01）；`plot` 表达式同样可用，原有写法行为不变。
+
+### 变更
+
+- **图表引擎从 Mermaid.js 换成 Pele**：`mermaid` 节点改由 [Pele](https://github.com/obsidianmd/pele)（MIT，Obsidian 出品）把 Mermaid 12.1 语法渲染成 SVG。按需资产 `lib/assets/mermaid.js`（3.4 MB）换成 `lib/assets/pele.js`（310 kB / gzip 113 kB，只注册白名单内的 9 种图），渲染由异步布局改为同步输出，配色从 `themeVariables` 改为 `.mermaid` 上的 `--pele-*` → 宿主 `--dsw-alias-*` 桥接，切主题只换 CSS 变量、不再重绘；`mermaid` devDependency、`mermaid-core.ts`、`asset-mermaid.ts`、`mermaid-colors.ts` 与 `check-mermaid-browser.mjs` 基准脚本一并移除。种类白名单、`ensureFlowchartKind`、`repairMermaidSource`、`assertSafeSvg` 出口检查保持不变。
+
+## [0.14.0] - 2026-10-21
+
+### 新增
+
 - 新增 `icon` 节点：内置 OpenAI Apps SDK UI 的 749 个可忠实渲染字形（MIT，见 `THIRD_PARTY_NOTICES.md`），其中 64 个随客户端内联，其余 685 个首次使用时经 `lib/assets/icons.js` 一次性载入；未知名字降级为中性圆点，不触发下载。生成器直接解析固定上游 TSX，保留真实几何、显式填色与根级描边继承；无法忠实渲染的 6 个字形（分组 / clipPath）被明确剔除并在生成日志中列出，不再静默过滤。
 - 新增 `blocks` 节点：按行分组的色块图，覆盖阶梯（8→4→2→1）、等分块与泳道三种形态。支持 `columns` 固定列数、行级 `variant`（`fill` / `outline` / `plain`）、单元格 `tone` / `color` / `sub`；格子是数据而非节点，64 格仍只占 1 个节点预算。
 - 新增 `arrow` 节点：细线连接件（`dir` / `length` / `label`），替代此前只能用文字「↓」表达流程的做法。
 - 新增排版字段：`card.flat`（去阴影的图内面板）、`text.tone`（语义色文字）、`text.mono`（等宽文字，无行内代码底色）、`col.width`（按百分比占行宽）、`row.justify`（主轴对齐）。
 - `SKILL.md` 新增「阶段图」编排范式；图标名清单拆到 `ICON-NAMES.md`，按需 grep，不再随 SKILL 全量加载。
-- 新增 `calc` 节点：本地公式计算器。`inputs`（输入框或滑块，带 `prefix`/`unit`/范围）+ `outputs`（公式、`decimals`、`primary` 主数字），用户改任一输入即在浏览器内重算，**不回模型**；后面的结果可引用前面带 `name` 的结果。公式走 SafeMath 严格模式：未声明的名字、函数参数个数不对、引用排在后面的结果都在校验阶段报错并给出位置，`10%` 这类写法附带「百分比写成 /100」提示。带 `id` 时输入值刷新保留，并以 `id.name` 进入兄弟 `submit` 的 `fields`。输入框接受全角数字与千分位；非法输入标红并显示「—」，失焦时按范围收拢。`SKILL.md` 新增「计算器页」范式与反例，画廊新增分账示例。
-- SafeMath 新增比较运算（`< <= > >= == !=`，得 1/0）、`if(条件, 是, 否)`、`clamp(v, 下限, 上限)` 与 `round(v, 位数)`（按十进制移位，`round(1.005, 2)` 得 1.01）；`plot` 表达式同样可用，原有写法行为不变。
-
-### 安全
-
-- SafeMath 的函数名改为只查自有属性：此前 `constructor(1)`、`toString(1)` 会解析到 `Object.prototype` 上的方法（无法执行代码，但会产出非数值结果），现在与未知函数一样报解析错误。
+- `copy` 节点新增可选的纯文本预览，支持在回答内展开查看；预览状态按组件出现位置保存（#329）。
 
 ### 变更
 
-- **图表引擎从 Mermaid.js 换成 Pele**：`mermaid` 节点改由 [Pele](https://github.com/obsidianmd/pele)（MIT，Obsidian 出品）把 Mermaid 12.1 语法渲染成 SVG。按需资产 `lib/assets/mermaid.js`（3.4 MB）换成 `lib/assets/pele.js`（310 kB / gzip 113 kB，只注册白名单内的 9 种图），渲染由异步布局改为同步输出，配色从 `themeVariables` 改为 `.mermaid` 上的 `--pele-*` → 宿主 `--dsw-alias-*` 桥接，切主题只换 CSS 变量、不再重绘；`mermaid` devDependency、`mermaid-core.ts`、`asset-mermaid.ts`、`mermaid-colors.ts` 与 `check-mermaid-browser.mjs` 基准脚本一并移除。种类白名单、`ensureFlowchartKind`、`repairMermaidSource`、`assertSafeSvg` 出口检查保持不变。
 - 语义底纹浓度由 8% 调整为 12%（深色主题 18%）：8% 在白色画布上的明度差不足 3%，badge、callout、card tone 与新图标底板都会退化为纯白。新增 `--dsl-g-tint-quiet` 保留旧的 8% 档位。
 
 ### 修复
 
+- 缓存无锚点 DOM 围栏的文档顺序与行顺序，避免流式正文更新重复扫描整篇对话；结构、来源、流式状态与会话变化会使相应缓存失效（#321）。
+- 围栏观察器只维护发生变化的正文区域，并跳过输入框编辑；侧栏中的围栏仍可正常更新。
+- `plot` 拖动距离按实际显示宽度换算，修复响应式布局下平移幅度不正确的问题（#349）。
+- 百分比列宽会为行间距留出空间，修复 `50/50`、`40/60` 等多列布局横向溢出的问题。
+- 表格筛选后保留源行身份，避免详情展开对应到另一行（#347）。
+- 支持识别标签末尾带标点的 `dsh-ui` 围栏，并推断缺少类型的合法组件节点（#325）。
+- GenUI 回合只有思考、没有交付正文时，先由交付提醒继续请求模型；预算耗尽时保留宿主空响应错误，避免把失败当成完成。
+- 捆绑注册的 GenUI 技能摘要与 `SKILL.md` 对齐，向模型提供要点、对比、流程、状态和交互等使用时机；技能目录与加载结果的摘要均由回归检查防止漂移（#327）。
 - Mermaid 使用实际图表卡片的主题色并保留原有透明度；卡片局部配色及主题样式表更新后，已渲染的图表会同步刷新，避免沿用全局或旧的不透明底色（#328）。
 - 修复 `repairGenuiSpec` 重建节点时丢弃 `row.justify` 的问题：repair 维护着第二份手写字段表，新增字段必须在 `src/client/guard.ts` 同步登记。
 - 独立导出（artifact / standalone）的资源枚举补上 `icons`，避免离线 HTML 中的非内联字形退化为圆点。
@@ -31,6 +44,7 @@
 ### 兼容性
 
 - 将当前 DSH 的 CI 与发布验证目标更新为 `0.2.1-rc.2`，保留 `0.2.0-rc.1` 最低版本验证；现有版本范围已包含 rc.2，无需放宽依赖约束（#337）。
+- 开发依赖与安装说明同步到 DSH `0.2.1-rc.2`；宿主接口检查按目标版本安装并核对所有直接 DSH 开发依赖，避免最低版本或当前版本检查混用其他宿主版本。
 
 ## [0.13.0] - 2026-10-17
 

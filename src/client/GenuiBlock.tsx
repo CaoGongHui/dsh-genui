@@ -7,6 +7,7 @@
  * components live in src/client/blocks/*.
  */
 import { renderInline } from './inline.ts'
+import { CopyPreviewContext, useCopyPreviewState } from './copy-preview-state.ts'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGenuiAction } from './action-context.ts'
 import css from './GenuiBlock.module.css'
@@ -16,6 +17,7 @@ import { renderNode } from './blocks/render-node.tsx'
 import type { AnswersState, GenuiBlockProps } from './blocks/state.ts'
 import type { GenuiSpec } from './spec.ts'
 import { compileSubmissionRegistry } from './submission-registry.ts'
+import { evaluateComputed, resolveComputedSpec } from './computed.ts'
 
 export const GENUI_ACTION_DEBOUNCE_MS = 300
 
@@ -85,6 +87,7 @@ function specEquivalent(a: GenuiSpec, b: GenuiSpec): boolean {
  * when the reply settles; switching an existing durable key starts fresh. */
 function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialState, onStateChange, onStateSnapshot }: GenuiBlockProps) {
   const gap = spec.gap ?? 16
+  const copyPreviews = useCopyPreviewState(spec)
   const onAction = useDebouncedAction(useGenuiAction())
   const stateChangeRef = useRef(onStateChange)
   stateChangeRef.current = onStateChange
@@ -97,13 +100,15 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   const [answers, setAnswers] = useState<Record<string, string>>(persisted?.answers ?? {})
   const [multiAnswers, setMultiAnswers] = useState<Record<string, string[]>>(persisted?.multiAnswers ?? {})
   const [fields, setFields] = useState<Record<string, string>>(persisted?.fields ?? {})
-  const submissionRegistry = useMemo(() => compileSubmissionRegistry(spec), [spec])
+  const computedSpec = useMemo(() => resolveComputedSpec(spec, evaluateComputed(spec, fields)), [spec, fields])
+  const submissionRegistry = useMemo(() => compileSubmissionRegistry(computedSpec), [computedSpec])
   const [locked, setLocked] = useState(persisted?.locked === true)
   const [round, setRound] = useState(0)
   // Secret (password) field ids: their values never persist and never join
   // submit collection — the input itself stays masked and its own action
   // still delivers the value on explicit user submit.
   const [secretFields, setSecretFields] = useState<ReadonlySet<string>>(new Set())
+  const [invalidNumericFields, setInvalidNumericFields] = useState<ReadonlySet<string>>(new Set())
   const setAnswer = useCallback((group: string, choice: string) => {
     setAnswers(prev => (prev[group] === choice ? prev : { ...prev, [group]: choice }))
   }, [])
@@ -130,7 +135,17 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     // next mount. Blank values are still excluded from submit collection by
     // SubmitNode's filledFields filter (and from persistence for secrets), so
     // this does not change what the model receives.
-    setFields(prev => (prev[id] === value ? prev : { ...prev, [id]: value }))
+    setFields(prev => (Object.hasOwn(prev, id) && prev[id] === value ? prev : { ...prev, [id]: value }))
+  }, [])
+  const setNumericFieldValidity = useCallback((id: string, valid: boolean) => {
+    setInvalidNumericFields(prev => {
+      const currentlyInvalid = prev.has(id)
+      if (currentlyInvalid === !valid) return prev
+      const next = new Set(prev)
+      if (valid) next.delete(id)
+      else next.add(id)
+      return next
+    })
   }, [])
   const registerSecretField = useCallback((id: string) => {
     setSecretFields(prev => (prev.has(id) ? prev : new Set(prev).add(id)))
@@ -143,10 +158,10 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   }, [])
   const answersState = useMemo<AnswersState>(
     () => ({
-      answers, multiAnswers, fields, secretFields, registry: submissionRegistry, locked, round,
-      setAnswer, setMultiAnswer, setField, registerSecretField, clear, setLocked,
+      answers, multiAnswers, fields, secretFields, invalidNumericFields, registry: submissionRegistry, locked, round,
+      setAnswer, setMultiAnswer, setField, setNumericFieldValidity, registerSecretField, clear, setLocked,
     }),
-    [answers, multiAnswers, fields, secretFields, submissionRegistry, locked, round, setAnswer, setMultiAnswer, setField, registerSecretField, clear],
+    [answers, multiAnswers, fields, secretFields, invalidNumericFields, submissionRegistry, locked, round, setAnswer, setMultiAnswer, setField, setNumericFieldValidity, registerSecretField, clear],
   )
   const durableState = useMemo(() => {
     const safeFields = Object.fromEntries(Object.entries(fields).filter(([id]) => !secretFields.has(id)))
@@ -186,31 +201,33 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     recordFence(spec)
   }, [spec])
   return (
-    <div className={css.block} data-genui>
-      {spec.title !== undefined && <div className={css.banner}>{renderInline(spec.title)}</div>}
-      <div className={css.col} style={{ gap: `${gap}px` }}>
-        {spec.items.map((c, i) => (
-          // Staggered reveal: each root item fades/slides in after its
-          // predecessors, so the block assembles piece by piece instead of
-          // popping in as one slab. Delay capped so long specs still settle
-          // quickly; prefers-reduced-motion disables it (see CSS).
-          <div
-            key={i}
-            className={css.reveal}
-            style={{
-              animationDelay: `${Math.min(i * 90, 720)}ms`,
-              ...(!animateEntrance || persisted !== null ? { animation: 'none' } : {}),
-            }}
-            onAnimationEnd={event => {
-              // Reattaching this DOM node must not replay its completed entrance.
-              if (event.target === event.currentTarget) event.currentTarget.style.animation = 'none'
-            }}
-          >
-            {renderNode(c, i, trackedAction, 0, answersState)}
-          </div>
-        ))}
+    <CopyPreviewContext.Provider value={copyPreviews}>
+      <div className={css.block} data-genui>
+        {computedSpec.title !== undefined && <div className={css.banner}>{renderInline(computedSpec.title)}</div>}
+        <div className={css.col} style={{ gap: `${gap}px` }}>
+          {computedSpec.items.map((c, i) => (
+            // Staggered reveal: each root item fades/slides in after its
+            // predecessors, so the block assembles piece by piece instead of
+            // popping in as one slab. Delay capped so long specs still settle
+            // quickly; prefers-reduced-motion disables it (see CSS).
+            <div
+              key={i}
+              className={css.reveal}
+              style={{
+                animationDelay: `${Math.min(i * 90, 720)}ms`,
+                ...(!animateEntrance || persisted !== null ? { animation: 'none' } : {}),
+              }}
+              onAnimationEnd={event => {
+                // Reattaching this DOM node must not replay its completed entrance.
+                if (event.target === event.currentTarget) event.currentTarget.style.animation = 'none'
+              }}
+            >
+              {renderNode(c, i, trackedAction, 0, answersState)}
+            </div>
+          ))}
+        </div>
       </div>
-    </div>
+    </CopyPreviewContext.Provider>
   )
 }
 

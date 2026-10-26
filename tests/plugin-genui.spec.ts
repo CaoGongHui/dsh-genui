@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import SkillRegistry from '@deepseek-ai/dsh-skill'
@@ -319,7 +321,8 @@ describe('genui:fence section', () => {
 
     const genui = await ctx.plugin(GenUI)
 
-    expect(await ctx.skills.list()).toEqual(expect.arrayContaining([
+    const catalog = await ctx.skills.list()
+    expect(catalog).toEqual(expect.arrayContaining([
       expect.objectContaining({
         name: 'genui',
         provider: 'dsh-genui',
@@ -330,6 +333,9 @@ describe('genui:fence section', () => {
         },
       }),
     ]))
+    const summary = catalog.find(skill => skill.name === 'genui')
+    const frontmatter = readFileSync('SKILL.md', 'utf8').split('\n---\n')[0]
+    expect(frontmatter?.split('\n')).toContain(`description: ${JSON.stringify(summary?.description)}`)
 
     const skill = await ctx.skills.get('genui')
     expect(skill).toMatchObject({
@@ -337,8 +343,20 @@ describe('genui:fence section', () => {
       provider: 'dsh-genui',
       source: 'bundled',
     })
+    expect(skill?.description).toBe(summary?.description)
     expect(skill?.description).toContain('Preserve conversation language')
     expect(skill?.description).not.toMatch(/[\u3400-\u9fff]/u)
+
+    // The description the panel shows is PARSED out of SKILL.md, not a second copy in
+    // code. Asserting the two agree would not catch the bug: both copies shared the
+    // sentence \`Preserve conversation language\`, and they had already drifted apart
+    // everywhere else, so a substring check passed while the panel showed a stale
+    // sentence the model never read. Compare against the file instead.
+    const skillMd = readFileSync(join(process.cwd(), 'SKILL.md'), 'utf8')
+    const front = skillMd.slice(4, skillMd.indexOf('\n---\n', 4))
+    const declared = /^description:\s*(.+?)\s*$/mu.exec(front)?.[1]?.replace(/^['"]|['"]$/gu, '')
+    expect(declared, 'SKILL.md must declare a description').toBeDefined()
+    expect(skill?.description).toBe(declared)
     expect(skill?.content).toContain('chart:')
     expect(skill?.content).not.toContain('name: genui')
 

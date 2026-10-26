@@ -8,8 +8,16 @@
  * white-listed function call. Nothing reaches `eval`, globals, or prototypes.
  * @module @changfenhuang/dsh-genui/client/calc-engine
  */
-import { checkMathExpr, compileMathExpr, SAFE_MATH_RESERVED } from './safe-math.ts'
+import { checkMathExpr, compileMathExprProgram, SAFE_MATH_RESERVED, type SafeMathOptions } from './safe-math.ts'
 import type { GenuiCalc, GenuiCalcInput } from './spec.ts'
+
+/** Calculator mode: declared names only, no plot conveniences, checked arity. */
+const CALC_MATH: Pick<SafeMathOptions, 'allowImplicitVariables' | 'checkArity'> = { allowImplicitVariables: false, checkArity: true }
+
+/** Same names with a finite stand-in value, for compile-only checks (SafeMath rejects non-finite variables). */
+function placeholders(scope: Readonly<Record<string, number>>): Record<string, number> {
+  return Object.fromEntries(Object.keys(scope).map(name => [name, 0]))
+}
 
 /** Variable names formulas may declare: identifier-shaped, ≤32 characters. */
 export const CALC_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]{0,31}$/
@@ -29,7 +37,7 @@ const PERCENT_SUFFIX_RE = /\d\s*%\s*(?:$|[)+\-*/,<>=!])/
  * compiles. Adds a percent hint because `x * 10%` is the most common slip.
  */
 export function calcFormulaProblem(expr: string, scope: Readonly<Record<string, number>>): string | null {
-  const problem = checkMathExpr(expr, { vars: { ...scope }, strict: true })
+  const problem = checkMathExpr(expr, { ...CALC_MATH, vars: placeholders(scope) })
   if (problem === null) return null
   return PERCENT_SUFFIX_RE.test(expr) ? `${problem} (write percentages as /100; % is modulo)` : problem
 }
@@ -49,14 +57,19 @@ export function evaluateCalc(node: Pick<GenuiCalc, 'inputs' | 'outputs'>, values
   const scope: Record<string, number> = {}
   for (const input of node.inputs) scope[input.name] = values[input.name] ?? Number.NaN
   return node.outputs.map(output => {
-    const fn = compileMathExpr(output.expr, { vars: scope, strict: true })
-    if (fn === null) {
+    // Compile against stand-ins first: that separates "the formula is wrong"
+    // (an error the model must fix) from "an input is not a number yet" (a
+    // dash the user fixes by typing), and lists which names it actually reads.
+    const shape = compileMathExprProgram(output.expr, { ...CALC_MATH, vars: placeholders(scope) })
+    if (shape === null) {
       const error = calcFormulaProblem(output.expr, scope) ?? 'invalid formula'
       // Later outputs may still reference this name; they read "unknown".
       if (output.name !== undefined) scope[output.name] = Number.NaN
       return { value: Number.NaN, error }
     }
-    const raw = fn(0)
+    const pending = shape.variables.some(name => !Number.isFinite(scope[name]))
+    const program = pending ? null : compileMathExprProgram(output.expr, { ...CALC_MATH, vars: scope })
+    const raw = program === null ? Number.NaN : program.evaluate(0)
     const value = typeof raw === 'number' && Number.isFinite(raw) ? raw : Number.NaN
     if (output.name !== undefined) scope[output.name] = value
     return { value }
