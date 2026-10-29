@@ -396,7 +396,8 @@ describe('GenUI runtime schema normalization', () => {
       }, {
         type: 'diagram',
         kind: 'flowchart',
-        nodes: [{ id: 'a', label: 'A', lable: 'typo' }],
+        id: 'selectedNode',
+        nodes: [{ id: 'a', label: 'A', description: 'Node detail', lable: 'typo' }],
         edges: [{ from: 'a', to: 'a', fro: 'typo' }],
         zones: [{ label: 'z', labell: 'typo' }],
         theme: { accent: '#fff', acccent: '#000' },
@@ -415,6 +416,8 @@ describe('GenUI runtime schema normalization', () => {
       'items[3].zones[0].labell',
       'items[3].theme.acccent',
     ]))
+    expect(warnings.some(warning => warning.path === 'items[3].id')).toBe(false)
+    expect(warnings.some(warning => warning.path === 'items[3].nodes[0].description')).toBe(false)
     expect(warnings.some(warning => warning.path.includes('custom-widget'))).toBe(false)
   })
 

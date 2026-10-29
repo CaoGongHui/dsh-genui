@@ -12,6 +12,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGenuiAction } from './action-context.ts'
 import css from './GenuiBlock.module.css'
 import { loadBlockState, saveBlockState } from './interaction-store.ts'
+import { GENUI_LIMITS } from './genui-runtime/index.ts'
 import { recordFence, recordInteraction } from './achievement-store.ts'
 import { renderNode } from './blocks/render-node.tsx'
 import type { AnswersState, GenuiBlockProps } from './blocks/state.ts'
@@ -104,17 +105,18 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     const numeric = new Set<string>()
     const secret = new Set<string>()
     const declared = new Set<string>()
-    const mapOptions = new Map<string, Set<string>>()
+    const fieldOptions = new Map<string, Set<string>>()
     walkGenuiNodes(spec, node => {
-      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map') && node.id !== undefined) declared.add(node.id)
+      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'diagram') && node.id !== undefined) declared.add(node.id)
       if (node.type === 'map' && node.id !== undefined) {
-        mapOptions.set(node.id, new Set(repairMap(node)?.locations.map(location => location.id)))
+        fieldOptions.set(node.id, new Set(repairMap(node)?.locations.map(location => location.id)))
       }
+      if (node.type === 'diagram' && node.id !== undefined) fieldOptions.set(node.id, new Set(node.nodes.slice(0, GENUI_LIMITS.maxDiagramNodes).map(item => item.id)))
       if (node.type !== 'input' || node.id === undefined) return
       if (node.inputType === 'number') numeric.add(node.id)
       if (node.inputType === 'password') secret.add(node.id)
     })
-    return { numeric, secret, declared, mapOptions }
+    return { numeric, secret, declared, fieldOptions }
   }, [spec])
   const secretFields = fieldKinds.secret
   // 输入草稿始终归属于字段；计算使用最近的有效数字，提交与保存使用草稿值。
@@ -126,12 +128,12 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   })
   const fields = useMemo(() => Object.fromEntries(Object.entries(fieldState.fields)
     .filter(([id]) => fieldKinds.declared.has(id) && !secretFields.has(id))
-    .map(([id, value]) => [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? '' : value])), [fieldState.fields, fieldKinds, secretFields])
+    .map(([id, value]) => [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? '' : value])), [fieldState.fields, fieldKinds, secretFields])
   // 替换内容可能沿用表单标识并移除字段；已移除字段不能进入草稿、导出或后续提交。
   useEffect(() => {
     setFieldState(prev => {
       const entries = Object.entries(prev.fields).filter(([id]) => fieldKinds.declared.has(id) && !secretFields.has(id))
-        .map(([id, value]): [string, string] => [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? '' : value])
+        .map(([id, value]): [string, string] => [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? '' : value])
       if (entries.length === Object.keys(prev.fields).length && entries.every(([id, value]) => prev.fields[id] === value)) return prev
       return { fields: Object.fromEntries(entries), numericValues: Object.fromEntries(Object.entries(prev.numericValues)
         .filter(([id]) => fieldKinds.numeric.has(id) && !secretFields.has(id))) }
@@ -161,10 +163,27 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   // Field ids / answer groups hidden by a `when` condition right now. Submit
   // uses this to drop their values and their required-status: a hidden control
   // must not submit a stale value, nor block submission by looking unanswered.
-  const hiddenKeys = useMemo(
-    () => collectHiddenKeys(computedSpec.items, { fields, answers, multiAnswers }),
-    [computedSpec, fields, answers, multiAnswers],
-  )
+  const hiddenKeys = useMemo(() => {
+    let hidden = new Set<string>()
+    const seen = new Set<string>()
+    for (let pass = 0; pass <= GENUI_LIMITS.maxNodes; pass += 1) {
+      const current = {
+        fields: Object.fromEntries(Object.entries(fields).filter(([id]) => !hidden.has(id))),
+        answers: Object.fromEntries(Object.entries(answers).filter(([id]) => !hidden.has(id))),
+        multiAnswers: Object.fromEntries(Object.entries(multiAnswers).filter(([id]) => !hidden.has(id))),
+      }
+      const next = collectHiddenKeys(computedSpec.items, current)
+      if (next.size === hidden.size && [...next].every(id => hidden.has(id))) return next
+      const signature = [...next].sort().join('\u0000')
+      if (seen.has(signature)) throw new Error('GenUI conditional visibility did not reach a stable state')
+      seen.add(signature)
+      hidden = new Set(next)
+    }
+    throw new Error('GenUI conditional visibility exceeded the node limit')
+  }, [computedSpec, fields, answers, multiAnswers])
+  const visibleFields = useMemo(() => Object.fromEntries(Object.entries(fields).filter(([id]) => !hiddenKeys.has(id))), [fields, hiddenKeys])
+  const visibleAnswers = useMemo(() => Object.fromEntries(Object.entries(answers).filter(([id]) => !hiddenKeys.has(id))), [answers, hiddenKeys])
+  const visibleMultiAnswers = useMemo(() => Object.fromEntries(Object.entries(multiAnswers).filter(([id]) => !hiddenKeys.has(id))), [multiAnswers, hiddenKeys])
   const setAnswer = useCallback((group: string, choice: string) => {
     setAnswers(prev => (prev[group] === choice ? prev : { ...prev, [group]: choice }))
   }, [])
@@ -215,10 +234,10 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   }, [])
   const answersState = useMemo<AnswersState>(
     () => ({
-      answers, multiAnswers, fields, secretFields, invalidNumericFields, hidden: hiddenKeys, registry: submissionRegistry, locked, round,
+      answers: visibleAnswers, multiAnswers: visibleMultiAnswers, fields: visibleFields, secretFields, invalidNumericFields, hidden: hiddenKeys, registry: submissionRegistry, locked, round,
       setAnswer, setMultiAnswer, setField, clear, setLocked,
     }),
-    [answers, multiAnswers, fields, secretFields, invalidNumericFields, hiddenKeys, submissionRegistry, locked, round, setAnswer, setMultiAnswer, setField, clear],
+    [visibleAnswers, visibleMultiAnswers, visibleFields, secretFields, invalidNumericFields, hiddenKeys, submissionRegistry, locked, round, setAnswer, setMultiAnswer, setField, clear],
   )
   const durableState = useMemo(() => {
     const safeFields = Object.fromEntries(Object.entries(fields).filter(([id]) => !secretFields.has(id)))

@@ -24,7 +24,7 @@ export interface CheckboxSubmissionMember {
 export interface FieldSubmissionMember {
   kind: 'field'
   key: string
-  fieldType: 'input' | 'textarea' | 'select' | 'slider' | 'map'
+  fieldType: 'input' | 'textarea' | 'select' | 'slider' | 'map' | 'diagram'
   secret: boolean
 }
 
@@ -94,6 +94,7 @@ export function analyzeSubmissionRegistry(spec: GenuiSpec, allowExternalGroups =
       case 'select':
       case 'slider':
       case 'map':
+      case 'diagram':
         if (node.id === undefined) return
         member = { kind: 'field', key: node.id, fieldType: node.type, secret: node.type === 'input' && node.inputType === 'password' }
         keyPath = `${path}.id`
