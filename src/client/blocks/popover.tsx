@@ -6,6 +6,7 @@ import {
   flip,
   offset,
   safePolygon,
+  size,
   shift,
   useClick,
   useDismiss,
@@ -29,7 +30,21 @@ export function PopoverNode({ node }: { node: GenuiPopover }): ReactElement {
     open,
     onOpenChange: setOpen,
     placement: node.placement ?? 'top',
-    middleware: [offset(8), flip({ padding: 12 }), shift({ padding: 12 })],
+    middleware: [
+      offset(8),
+      flip({ padding: 12 }),
+      size({
+        padding: 12,
+        /** 限制长内容高度，使弹层在可用视口范围内滚动。 */
+        apply({ availableHeight, availableWidth, elements }) {
+          Object.assign(elements.floating.style, {
+            maxHeight: `${Math.min(420, Math.max(0, availableHeight))}px`,
+            maxWidth: `${Math.min(360, Math.max(0, availableWidth))}px`,
+          })
+        },
+      }),
+      shift({ padding: 12 }),
+    ],
     whileElementsMounted: autoUpdate,
   })
   const click = useClick(context, { enabled: trigger === 'click' })
