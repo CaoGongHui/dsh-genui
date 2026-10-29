@@ -22,7 +22,8 @@ function scan(items: unknown[], report: GenuiPortabilityReport, assets: Set<Genu
     // standalone export must therefore embed `icons` too, or the glyph degrades
     // to the fallback dot in the exported HTML.
     if (node.type === 'icon' && typeof node.name === 'string' && ICONS[node.name] === undefined) assets.add('icons')
-    if (typeof node.action === 'string' || node.type === 'submit' && (typeof node.action === 'string' || typeof node.resetAction === 'string')) report.hasModelActions = true
+    if (typeof node.action === 'string' || node.type === 'entity-card' && Array.isArray(node.actions) && node.actions.some(action => typeof action.action === 'string')
+      || node.type === 'submit' && (typeof node.action === 'string' || typeof node.resetAction === 'string')) report.hasModelActions = true
     if (node.type === 'image' || node.type === 'audio' || node.type === 'video') {
       const src = safeMediaSrc(node.src)
       if (src !== undefined) report.externalMedia.push(src)
@@ -36,6 +37,10 @@ function scan(items: unknown[], report: GenuiPortabilityReport, assets: Set<Genu
         const src = safeMediaSrc(image.src)
         if (src !== undefined) report.externalMedia.push(src)
       }
+    }
+    if (node.type === 'entity-card') {
+      const src = safeMediaSrc(node.image)
+      if (src !== undefined) report.externalMedia.push(src)
     }
     if (Array.isArray(node.items) && node.type !== 'image-group') {
       if (node.type === 'carousel') scan(node.items.slice(0, GENUI_LIMITS.maxCarouselItems), report, assets)

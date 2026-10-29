@@ -8,7 +8,7 @@
  * v1 interactivity is client-side only: buttons, tabs, checkboxes, and inputs
  * are operable, but events do NOT flow back to the model.
  */
-import { COMPONENT_SCHEMAS, GENUI_NATIVE_TYPES, WHEN_OPS } from './genui-runtime/schema.ts'
+import { COMPONENT_SCHEMAS, GENUI_NATIVE_TYPES, POPOVER_PLACEMENTS, WHEN_OPS } from './genui-runtime/schema.ts'
 
 /** One node in the component tree. */
 /** Layout hints accepted by every node: `span` is how many columns the node
@@ -105,6 +105,9 @@ export type GenuiNode = (
   | GenuiIcon
   | GenuiBlocks
   | GenuiArrow
+  | GenuiEditor
+  | GenuiEntityCard
+  | GenuiPopover
 ) & GenuiLayoutHints
 
   | (GenuiEChart & GenuiLayoutHints)
@@ -200,6 +203,49 @@ export interface GenuiText {
   mono?: boolean
   /** Horizontal alignment; `center?: true` normalizes to `align: 'center'`. */
   align?: 'left' | 'center' | 'right'
+}
+
+/** Editable plain-text content whose draft is stored with the containing block. */
+export interface GenuiEditor {
+  type: 'editor'
+  id: string
+  value: string
+  label?: string
+  placeholder?: string
+  rows?: number
+}
+
+export interface GenuiEntityMetadata {
+  label: string
+  value: string
+}
+
+export interface GenuiEntityAction {
+  label: string
+  action: string
+  tone?: 'primary' | 'danger' | 'success' | 'ghost'
+}
+
+/** A compact summary for a person, product, place, or organization. */
+export interface GenuiEntityCard {
+  type: 'entity-card'
+  name: string
+  image?: string
+  imageAlt?: string
+  description?: string
+  metadata?: GenuiEntityMetadata[]
+  href?: string
+  sourceLabel?: string
+  actions?: GenuiEntityAction[]
+}
+
+/** A keyboard-operable floating explanation attached to a labelled trigger. */
+export interface GenuiPopover {
+  type: 'popover'
+  label: string
+  content: string
+  trigger?: 'click' | 'hover'
+  placement?: typeof POPOVER_PLACEMENTS[number]
 }
 
 export interface GenuiButton {

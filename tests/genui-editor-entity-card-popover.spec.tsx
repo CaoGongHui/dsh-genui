@@ -1,0 +1,122 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { GenuiActionContext } from '../src/client/action-context.ts'
+import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
+import { validateGenuiSpec, repairGenuiSpec } from '../src/client/guard.ts'
+import type { GenuiSpec } from '../src/client/spec.ts'
+import { analyzeSubmissionRegistry, resolveSubmitState } from '../src/client/submission-registry.ts'
+import { analyzeGenuiPortability } from '../src/client/artifact/portability.ts'
+
+afterEach(() => {
+  cleanup()
+  localStorage.clear()
+})
+
+describe('Editor, Entity Card, and Popover', () => {
+  it('registers the initial editor value for submit state before the user edits', async () => {
+    const spec: GenuiSpec = {
+      items: [
+        { type: 'editor', id: 'draft', label: 'Working notes', value: 'Initial text' },
+        { type: 'submit', label: 'Save', action: 'save', groups: ['draft'] },
+      ],
+    }
+    let fields: Record<string, string> = {}
+    render(<GenuiBlock spec={spec} onStateSnapshot={state => { fields = state.fields ?? {} }} />)
+    await waitFor(() => expect(fields).toEqual({ draft: 'Initial text' }))
+
+    const { registry } = analyzeSubmissionRegistry(spec)
+    const result = resolveSubmitState({ registry, groups: ['draft'], state: {
+      answers: {}, multiAnswers: {}, fields, secretFields: new Set(),
+    } })
+    expect(result.answered).toBe(1)
+    expect(result.total).toBe(1)
+  })
+
+  it('autosaves editor drafts across block remounts and includes editor fields in submit state', async () => {
+    const spec: GenuiSpec = {
+      items: [
+        { type: 'editor', id: 'draft', label: 'Working notes', value: 'Initial text' },
+        { type: 'submit', label: 'Save', action: 'save', groups: ['draft'] },
+      ],
+    }
+    const first = render(<GenuiBlock spec={spec} stateKey="editor-session" />)
+    fireEvent.change(screen.getByRole('textbox', { name: 'Working notes' }), { target: { value: 'Updated text' } })
+    await waitFor(() => expect(localStorage.getItem('dsh.genui.interaction')).toContain('Updated text'))
+    first.unmount()
+
+    render(<GenuiBlock spec={spec} stateKey="editor-session" />)
+    expect((screen.getByRole('textbox', { name: 'Working notes' }) as HTMLTextAreaElement).value).toBe('Updated text')
+
+    const { registry, diagnostics } = analyzeSubmissionRegistry(spec)
+    expect(diagnostics).toEqual([])
+    expect(registry.members.get('draft')).toMatchObject({ kind: 'field', fieldType: 'editor' })
+    const result = resolveSubmitState({ registry, groups: ['draft'], state: {
+      answers: {}, multiAnswers: {}, fields: { draft: 'Updated text' }, secretFields: new Set(),
+    } })
+    expect(result.answered).toBe(1)
+    expect(result.total).toBe(1)
+  })
+
+  it('renders entity metadata and sends its action through the host callback', () => {
+    const events: Array<[string, Record<string, unknown>]> = []
+    const spec: GenuiSpec = { items: [{
+      type: 'entity-card',
+      name: 'Ada Lovelace',
+      image: '/ada.png',
+      imageAlt: 'Portrait of Ada Lovelace',
+      description: 'Mathematician',
+      metadata: [{ label: 'Field', value: 'Computing' }],
+      href: 'https://example.com/ada',
+      sourceLabel: 'Source',
+      actions: [{ label: 'Open details', action: 'open-ada' }],
+    }] }
+
+    render(<GenuiActionContext.Provider value={(action, payload) => events.push([action, payload])}>
+      <GenuiBlock spec={spec} />
+    </GenuiActionContext.Provider>)
+    expect(screen.getByRole('heading', { name: 'Ada Lovelace' }).textContent).toBe('Ada Lovelace')
+    expect(screen.getByRole('img', { name: 'Portrait of Ada Lovelace' }).getAttribute('src')).toBe('/ada.png')
+    expect(screen.getByText('Computing').textContent).toBe('Computing')
+    expect(screen.getByRole('link', { name: 'Source' }).getAttribute('rel')).toBe('noopener noreferrer')
+    fireEvent.click(screen.getByRole('button', { name: 'Open details' }))
+    expect(events).toEqual([['open-ada', { type: 'entity-card', name: 'Ada Lovelace', label: 'Open details' }]])
+    expect(analyzeGenuiPortability(spec)).toMatchObject({ externalMedia: ['/ada.png'], hasModelActions: true })
+  })
+
+  it('opens and closes popover details from the keyboard', async () => {
+    const spec: GenuiSpec = { items: [{ type: 'popover', label: 'What is this?', content: 'Additional context.' }] }
+    render(<GenuiBlock spec={spec} />)
+    const trigger = screen.getByRole('button', { name: 'What is this?' })
+    fireEvent.focus(trigger)
+    expect((await screen.findByRole('dialog')).textContent).toContain('Additional context.')
+    fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' })
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('opens on click and dismisses when the user clicks outside', async () => {
+    const spec: GenuiSpec = { items: [{ type: 'popover', label: 'Click details', content: 'Click content.', trigger: 'click' }] }
+    render(<GenuiBlock spec={spec} />)
+    fireEvent.click(screen.getByRole('button', { name: 'Click details' }))
+    expect((await screen.findByRole('dialog')).textContent).toContain('Click content.')
+    fireEvent.pointerDown(document.body)
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull())
+  })
+
+  it('opens hover details when the pointer enters the trigger', async () => {
+    const spec: GenuiSpec = { items: [{ type: 'popover', label: 'Hover details', content: 'Hover content.', trigger: 'hover' }] }
+    render(<GenuiBlock spec={spec} />)
+    const trigger = screen.getByRole('button', { name: 'Hover details' })
+    fireEvent.pointerEnter(trigger, { pointerType: 'mouse' })
+    fireEvent.mouseEnter(trigger)
+    fireEvent.mouseMove(trigger, { movementX: 1 })
+    expect((await screen.findByRole('dialog')).textContent).toContain('Hover content.')
+  })
+
+  it('repairs unsafe entity links and rejects invalid popover settings', () => {
+    const repaired = repairGenuiSpec({ items: [{
+      type: 'entity-card', name: 'Example', image: 'javascript:alert(1)', href: 'javascript:alert(1)',
+    }] })
+    expect(repaired?.items[0]).toEqual({ type: 'entity-card', name: 'Example' })
+    expect(validateGenuiSpec({ items: [{ type: 'popover', label: 'Info', content: 'Text', trigger: 'keyboard' }] }).ok).toBe(false)
+  })
+})

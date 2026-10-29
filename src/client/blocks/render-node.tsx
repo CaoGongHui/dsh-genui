@@ -34,6 +34,9 @@ import { SvgNode } from './svg.tsx'
 import { IconNode } from './icon.tsx'
 import { MapNode } from './map.tsx'
 import { BlocksNode } from './blocks.tsx'
+import { EditorNode } from './editor.tsx'
+import { EntityCardNode } from './entity-card.tsx'
+import { PopoverNode } from './popover.tsx'
 
 import { EChartNode } from '../EChartNode.tsx'
 
@@ -413,6 +416,9 @@ function renderNodeBody(
         renderNode(child, index, onAction, depth + 1, answers, `${path}.items[${index}]`))
     }</CarouselNode>
     case 'image-group': return <ImageGroupNode key={key} node={node} />
+    case 'editor': return <EditorNode key={JSON.stringify([path, node.id])} node={node} answers={answers} />
+    case 'entity-card': return <EntityCardNode key={key} node={node} onAction={onAction} />
+    case 'popover': return <PopoverNode key={key} node={node} />
     case 'compare': return <CompareNode key={key} node={node} />
     case 'choices': return <ChoicesNode key={JSON.stringify([path, node.group, answers?.round ?? 0])} node={node} onAction={onAction} answers={answers} />
     case 'image': return <ImageNode key={`${key}:${node.src}`} node={node} />

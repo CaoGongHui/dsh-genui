@@ -36,8 +36,8 @@ description: "Render structured interactive UI inline through the dsh-ui fence. 
 布局：`text` `row` `col` `grid` `card` `carousel` `divider` `spacer` `arrow` `hero`
 展示：`stat` `badge` `progress` `list` `table` `keyvalue` `avatar` `image` `image-group` `compare` `audio` `video` `timeline` `file-tree` `breadcrumb` `diff` `json` `code` `callout` `steps` `icon` `blocks`
 图表：`chart`（bars/line/donut，可多序列）`plot`（数学函数图）`echart`（ECharts 全功能图表）
-交互：`button` `input` `select` `checkbox` `radio` `switch` `slider` `textarea` `tabs` `accordion` `copy` `link` `submit`
-高级：`svg` `mermaid` `diagram` `scene3d` `quiz`
+交互：`button` `input` `select` `checkbox` `radio` `switch` `slider` `textarea` `editor` `tabs` `accordion` `copy` `link` `submit` `popover`
+高级：`svg` `mermaid` `diagram` `scene3d` `quiz` `entity-card`
 
 ### 布局
 - text: `{"type":"text","size":"display|h1|h2|h3|body|muted|caption","content":"...","align":"left|center|right"?}`（`tone:"danger|success|warning|info|muted"` 给整行文字上语义色，不用套 badge；`mono:true` 走等宽字体，用于十六进制/二进制/标识符，不带行内代码底色）（`size:"display"` 比标题大一档，作引言/开篇点题句，**一条回答 ≤1**；`center:true` 是旧写法，等价 `align:"center"`，新写一律用 `align`）
@@ -104,19 +104,26 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 - radio（**legacy，仅用于兼容老围栏**：试卷与决策都改用 `choices`。`choices` 的 `group` + `answer` + `explanation` + 兄弟 `submit` 已覆盖本地判分，且每个选项还能带代价与证据。新回答不要再用 radio）: `{"type":"radio","label":"<user-language label>","options":["<user-language option>","<user-language option>"],"selected":n?,"action":"pick"?}` — 单选；**加 `"group":"group-id"` 进入聚合模式**：选择只本地记录、不发往返；可设置 `"answer":正确下标或标签` 和 `"explanation":"<user-language explanation>"`，在纯 radio 且没有其他待发送表单状态时本地判卷
 - choices: `{"type":"choices","title":"<user-language title>","prompt":"<user-language question>","mode":"single|multi","max":2,"submit":"<button label>","action":"<action>","items":[{"label":"<option>","hint":"<one-line cost>","meta":"P0","recommended":true},{"label":"<option>","hint":"...","disabled":true,"reason":"<why unavailable>"}]}` — **要读者做决定的列表**，不是读的列表：每个选项自带一行代价（`hint`）、可选证据（`meta`，右对齐等宽）、`recommended` 推荐标记、`disabled` + `reason`（保留在列表里而不是删掉，读者要看得到为什么不行）。`mode` 默认单选；`multi` 配 `max` 控制上限。选中的行左侧有强调条 + 淡底，提交后显示「已发送 · 仍可修改」并且**允许继续改**（改了就清掉已发送状态）。`action` 缺省时选择完全留在本地；有 `action` 时提交回传 `{question, selected, mode}`。最多 8 项——超过 8 项说明这是一张表，不是一次选择。
 - link: `{"type":"link","label":"...","href":"https://..."?}` — 仅 http(s)/mailto 协议被接受；无 `href` 时渲染为纯文本样式（不会假装可点）
-- when（**任何节点都能带的条件显隐**）: `{"field":"<id 或 group>","op":"eq|neq|in|not-in|gt|gte|lt|lte|empty|not-empty|checked","value":...}` — 条件读的是**当前 block 自己的状态**：`input/select/slider/textarea` 按 `id`，`radio/checkbox/choices` 按 `group`。满足才渲染，不满足整棵子树都不出现；状态变化即时生效，不需要模型往返。
+- when（**任何节点都能带的条件显隐**）: `{"field":"<id 或 group>","op":"eq|neq|in|not-in|gt|gte|lt|lte|empty|not-empty|checked","value":...}` — 条件读的是**当前 block 自己的状态**：`input/select/slider/textarea/editor` 按 `id`，`radio/checkbox/choices` 按 `group`。满足才渲染，不满足整棵子树都不出现；状态变化即时生效，不需要模型往返。
   - **典型用法**：选了「公司主体」才出现「税号」；金额 > 1000 才出现「分期」；选了「自定义」才展开参数（`eq`）；多选里含「其他」才出现补充输入（`in`）。
   - **两条硬规则**：① 隐藏节点不渲染，读者看不到就绝不会提交它的旧值（`submit` 的 `fields`/`answers` 会剔除隐藏键）；② 隐藏字段不算「未填」，不会把提交按钮卡成不可用。
   - 缺省行为：没有 block 状态时（导出 HTML、面板无 provider）条件无法求值，节点**保持可见**——宁可多显示，也不静默删掉导出文档的一整个分支。
   - `in`/`not-in` 的 `value` 必须是数组；`gt`/`gte`/`lt`/`lte` 两边都按数字比较，非法数字视为不满足。
-- submit: `{"type":"submit","label":"<user-language action>","action":"grade","groups":["q1","styles"],"resetAction":"redo"?}` — 聚合按钮：`groups` 引用当前 block 中的 submission member key，来源为 `radio.group`、`checkbox.group`、`input.id`、`textarea.id`、`select.id`、`slider.id`；radio 需已选择，checkbox 组需至少选择一项，普通 field 的值需在 trim 后非空。`groups` 控制提交所需成员与完成进度；未设置时，至少有一个已完成成员即可提交。纯 radio 范围含 `answer` 且本次没有范围外 payload 时可本地判卷；其余场景一次发送 `[genui-action]`，payload 继续收集当前 block 中已填写的表单状态，字段名称保持 `answers`、`fields`、`total`、`answered`
+- submit: `{"type":"submit","label":"<user-language action>","action":"grade","groups":["q1","styles"],"resetAction":"redo"?}` — 聚合按钮：`groups` 引用当前 block 中的 submission member key，来源为 `radio.group`、`checkbox.group`、`input.id`、`textarea.id`、`editor.id`、`select.id`、`slider.id`；radio 需已选择，checkbox 组需至少选择一项，普通 field 的值需在 trim 后非空。`groups` 控制提交所需成员与完成进度；未设置时，至少有一个已完成成员即可提交。纯 radio 范围含 `answer` 且本次没有范围外 payload 时可本地判卷；其余场景一次发送 `[genui-action]`，payload 继续收集当前 block 中已填写的表单状态，字段名称保持 `answers`、`fields`、`total`、`answered`
 - switch: `{"type":"switch","label":"...","checked":true?,"action":"toggle"?}`
 - textarea: `{"type":"textarea","label":"...","placeholder":"...","rows":n?,"value":"...","action":"save"?,"id":"field-id"?}` — action 在失焦和 **Ctrl/Cmd+Enter** 时触发；blur 仅值有变化才发送；带 `id` 的值刷新后保留
+- editor: `{"type":"editor","id":"draft","label":"正文","value":"初始文本","placeholder":"继续编辑","rows":8}` — 纯文本编辑；改动自动保存到当前区块，浏览器刷新或重新打开相同会话中的相同内容时恢复；可复制当前文字；带 `id` 的值也可由 sibling `submit` 统一提交
+- entity-card: `{"type":"entity-card","name":"Ada Lovelace","image":"https://example.com/ada.png","description":"数学家","metadata":[{"label":"领域","value":"计算机科学"}],"href":"https://example.com/source","sourceLabel":"来源","actions":[{"label":"查看详情","action":"open-ada"}]}` — 展示实体图片、名称、描述、元数据、来源链接和操作按钮；操作按钮通过 `action` 发送给宿主
+- popover: `{"type":"popover","label":"说明","content":"补充信息","trigger":"click","placement":"top"}` — 补充说明可设为 `click` 或 `hover` 触发；支持键盘焦点、Escape 和外部点击关闭，位置会在视口边缘自动调整
 - tabs: `{"type":"tabs","tabs":[{"label":"...","items":[...]}]}` — 空 tab 可以省略 `items`，会按空数组处理
 - accordion: `{"type":"accordion","items":[{"title":"...","items":[...]}]}`
 - copy: `{"type":"copy","label":"<user-language action>","text":"<user-language text>","expandable":true?,"previewLines":n?}` · [docs/copy-preview.md](docs/copy-preview.md)
 
-**状态持久化（v2.7）**：radio 答案、checkbox 分组选择、交卷锁定、输入值按「会话 + 内容指纹」自动保存——用户刷新页面/重开会话，同一块 UI 的状态原样恢复；你重渲染**相同内容**会保留用户状态，渲染**新内容**（换题等）自动从头开始。
+**状态持久化（v2.7）**：radio 答案、checkbox 分组选择、交卷锁定、输入值和 Editor 草稿按「会话 + 内容指纹」自动保存——用户刷新页面/重开会话，同一块 UI 的状态原样恢复；你重渲染**相同内容**会保留用户状态，渲染**新内容**（换题等）自动从头开始。
+
+```dsh-ui
+{"items":[{"type":"editor","id":"reply","label":"回复草稿","value":"你好，","rows":6},{"type":"entity-card","name":"Ada Lovelace","description":"数学家","metadata":[{"label":"领域","value":"计算机科学"}],"href":"https://example.com/ada","actions":[{"label":"查看详情","action":"open-ada"}]},{"type":"popover","label":"保存说明","content":"编辑内容会保存在当前区块中。","trigger":"click","placement":"top"}]}
+```
 
 **卷子模式（多道选择题）**：每题一个 radio（带唯一 `group` + `answer` + `explanation`），最后放一个 submit（`groups` 列出全部题号）——用户全部选完点交卷，**分数和对错当场在 UI 里出现**，不用等你。只有换新题/进阶建议才发 action。不要每题单独发 action（会刷屏）。
 

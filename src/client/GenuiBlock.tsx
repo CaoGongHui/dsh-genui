@@ -106,7 +106,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     const declared = new Set<string>()
     const mapOptions = new Map<string, Set<string>>()
     walkGenuiNodes(spec, node => {
-      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map') && node.id !== undefined) declared.add(node.id)
+      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'editor') && node.id !== undefined) declared.add(node.id)
       if (node.type === 'map' && node.id !== undefined) {
         mapOptions.set(node.id, new Set(repairMap(node)?.locations.map(location => location.id)))
       }

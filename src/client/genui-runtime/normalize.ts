@@ -197,6 +197,8 @@ function normalizeNode(value: unknown, path: string, warnings: GenuiDiagnostic[]
     if (out[field] === undefined) continue
     const nestedValue = out[field]
     const cap = type === 'image-group' && field === 'items' ? GENUI_LIMITS.maxImageGroupItems
+      : type === 'entity-card' && field === 'metadata' ? GENUI_LIMITS.maxEntityMetadata
+      : type === 'entity-card' && field === 'actions' ? GENUI_LIMITS.maxEntityActions
       : type === 'map' && field === 'locations' ? GENUI_LIMITS.maxMapLocations
       : type === 'map' && field === 'routes' ? GENUI_LIMITS.maxMapRoutes : undefined
     if (cap !== undefined && Array.isArray(nestedValue)) {
