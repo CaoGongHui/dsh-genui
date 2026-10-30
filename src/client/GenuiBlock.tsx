@@ -110,7 +110,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     const segmentedDefaults = new Map<string, string>()
     const datePickers = new Map<string, { mode: 'single' | 'range'; min?: string; max?: string }>()
     walkGenuiNodes(spec, node => {
-      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'date-picker' || node.type === 'segmented-control' || node.type === 'diagram') && node.id !== undefined) declared.add(node.id)
+      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'editor' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'date-picker' || node.type === 'segmented-control' || node.type === 'diagram') && node.id !== undefined) declared.add(node.id)
       if (node.type === 'date-picker' && node.id !== undefined) {
         datePickers.set(node.id, { mode: node.mode ?? 'single', ...(node.min === undefined ? {} : { min: node.min }), ...(node.max === undefined ? {} : { max: node.max }) })
       }

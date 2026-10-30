@@ -101,8 +101,8 @@ Allowed \`type\` values; the \`genui\` skill, when available, carries the full c
 - 布局: text · row · col · grid · card · carousel · divider · spacer · hero（封面块，一条回答最多一个）
 - 展示: badge · stat · progress · list · table · keyvalue · timeline · file-tree · breadcrumb · callout · steps · diff · json · code · copy · avatar · image · image-group · compare（改动汇报优先）· audio · video · icon · blocks · arrow
 - 图表: chart {"kind":"bars|line|donut","data":[{"label":"...","value":n}]}（series：bars 分组/堆叠 / line 多序列） · echart (preset 名或 option 直通，清单见 skill) · plot (函数图) · svg (单图预览)
-- 交互: button · input · textarea · select · date-picker · segmented-control · checkbox · switch · slider · radio · submit · quiz · choices · link · tabs · accordion（row.justify / col.width / card.flat 见图元）
-- 高级: mermaid (流程图/时序/甘特/ER 等，关键字见 skill) · diagram (架构/流程图) · scene3d (3D WebGL)
+- 交互: button · input · textarea · editor · select · date-picker · segmented-control · checkbox · switch · slider · radio · submit · quiz · choices · link · tabs · accordion · popover
+- 高级: mermaid (流程图/时序/甘特/ER 等，关键字见 skill) · diagram (架构/流程图) · scene3d (3D WebGL) · entity-card
 
 **先问一句：删掉这个组件，读者会不会更费劲。** 会才出；不会就写正文。
 
@@ -124,7 +124,7 @@ Rules:
 - warning=block_markdown：按 replacement 改写并重验。
 - 规模: ≤200 节点、嵌套≤8 层（超出被截断）；一个主题一个主组件；3D mesh 1–5；plot 给合理 xMin/xMax。
 - LOCAL-FIRST + actions: UI 能自己做的状态变化（判卷、判题、重置、展开、选中）就地完成，零往返；action 只用于必须模型参与的事。交互以 [genui-action] name + 组件数据回传，届时重渲染更新 UI；无 action 的按钮禁用。
-- Durable state: 交互状态按「会话+内容指纹」持久化——刷新/重放恢复；相同内容保留，新内容重置。
+- Durable state: 交互状态按会话和内容指纹保存；相同内容刷新/重放时恢复，新内容重置；Editor 草稿也会保存。
 - 卷子模式: 每题 choices（group+answer+explanation）+ 一个 submit（groups 全列），本地判分。
 - Secrets ban: 不索取密码、API Key、Token、恢复码；需要时拒绝并解释。
 ${RENDER_UI_TOOL_GUIDANCE}

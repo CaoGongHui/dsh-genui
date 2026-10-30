@@ -41,6 +41,10 @@ export const GENUI_LIMITS = {
   maxMapLocations: 50,
   maxMapRoutes: 8,
   maxMapRoutePoints: 500,
+  /** Maximum editable text length and entity-card record counts. */
+  maxEditorChars: 12_000,
+  maxEntityMetadata: 24,
+  maxEntityActions: 8,
   /** Maximum `quiz` options. */
   maxQuizOptions: 8,
   /** Maximum `steps` / `timeline` / `breadcrumb` / `keyvalue` entries. */

@@ -109,6 +109,8 @@ function diagnoseNestedFields(
     if (Array.isArray(nestedValue)) {
       const items = node.type === 'image-group' && field === 'items'
         ? nestedValue.slice(0, GENUI_LIMITS.maxImageGroupItems)
+        : node.type === 'entity-card' && field === 'metadata' ? nestedValue.slice(0, GENUI_LIMITS.maxEntityMetadata)
+        : node.type === 'entity-card' && field === 'actions' ? nestedValue.slice(0, GENUI_LIMITS.maxEntityActions)
         : node.type === 'map' && field === 'locations' ? nestedValue.slice(0, GENUI_LIMITS.maxMapLocations)
         : node.type === 'map' && field === 'routes' ? nestedValue.slice(0, GENUI_LIMITS.maxMapRoutes)
         : nestedValue

@@ -43,18 +43,18 @@ const SHAPE_BY_TYPE: Readonly<Record<string, SkeletonShape>> = {
   diagram: 'diagram', mermaid: 'diagram',
   diff: 'code', json: 'code',
   image: 'media', 'image-group': 'media', video: 'media', audio: 'media', scene3d: 'media',
-  input: 'keyvalue', textarea: 'keyvalue', select: 'keyvalue', slider: 'keyvalue',
+  input: 'keyvalue', textarea: 'keyvalue', editor: 'keyvalue', select: 'keyvalue', slider: 'keyvalue',
   'date-picker': 'keyvalue', 'segmented-control': 'control',
   checkbox: 'keyvalue', radio: 'keyvalue', switch: 'keyvalue', submit: 'keyvalue',
   choices: 'list', quiz: 'list', compare: 'media',
   // Small single-object components: a pill is the honest placeholder for a
   // button/link/icon, not a stack of paragraphs.
-  button: 'control', link: 'control', icon: 'control', avatar: 'control',
+  button: 'control', link: 'control', icon: 'control', avatar: 'control', popover: 'control',
   arrow: 'control', breadcrumb: 'control', copy: 'control',
   // Hairlines carry no content; a rule says "a line arrives here".
   divider: 'rule', spacer: 'rule',
   hero: 'media', carousel: 'media', map: 'media', svg: 'media',
-  blocks: 'card', grid: 'card',
+  blocks: 'card', grid: 'card', 'entity-card': 'card',
 }
 
 /** The `type` of the first component written, if it is already readable. */

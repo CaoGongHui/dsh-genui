@@ -75,6 +75,8 @@ export const PLOT_KINDS = ['line', 'area', 'scatter'] as const
 export const MEDIA_ASPECT_RATIOS = ['16:9', '4:3', '1:1', '9:16'] as const
 export const COMPARE_MODES = ['side', 'stack', 'slider'] as const
 export const CHOICE_MODES = ['single', 'multi'] as const
+export const POPOVER_TRIGGERS = ['click', 'hover'] as const
+export const POPOVER_PLACEMENTS = ['top', 'top-start', 'top-end', 'right', 'right-start', 'right-end', 'bottom', 'bottom-start', 'bottom-end', 'left', 'left-start', 'left-end'] as const
 export const MESH_SHAPES = ['box', 'sphere', 'cone', 'cylinder', 'torus'] as const
 export const FILE_TYPES = ['file', 'dir'] as const
 export const DIAGRAM_KINDS = [
@@ -234,6 +236,9 @@ const imageGroupItemSchema = recordSchema(['src'], {
   src: 'string', alt: 'string', caption: 'string',
 }, {}, {}, { url: 'src', link: 'src' })
 
+const entityMetadataSchema = recordSchema(['label', 'value'], { label: 'string', value: 'string' })
+const entityActionSchema = recordSchema(['label', 'action'], { label: 'string', action: 'string', tone: 'string' }, {}, { tone: BUTTON_TONES })
+
 /** One side of a `compare` pair: the same media policy, plus a visible chip. */
 /** One option row: label + cost + optional evidence and state. */
 const choiceItemSchema = recordSchema(['label'], {
@@ -338,6 +343,13 @@ const RAW_COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   card: schema(['items'], { ...nodeFields, title: 'string', eyebrow: 'string', items: 'nodes', tone: 'string', accent: 'string', flat: 'boolean' }, { label: 'title', content: 'items', body: 'items' }, { enums: { tone: CARD_TONES } }),
   carousel: schema(['items'], { ...nodeFields, items: 'nodes', title: 'string', itemWidth: 'number', gap: 'number' }, { children: 'items' }),
   'image-group': schema(['items'], { ...nodeFields, items: 'array', title: 'string' }, {}, { nested: { items: imageGroupItemSchema } }),
+  editor: schema(['id', 'value'], { ...nodeFields, id: 'string', value: 'string', label: 'string', placeholder: 'string', rows: 'number' }),
+  'entity-card': schema(['name'], {
+    ...nodeFields, name: 'string', image: 'string', imageAlt: 'string', description: 'string', metadata: 'array', href: 'string', sourceLabel: 'string', actions: 'array',
+  }, {}, { nested: { metadata: entityMetadataSchema, actions: entityActionSchema } }),
+  popover: schema(['label', 'content'], {
+    ...nodeFields, label: 'string', content: 'string', trigger: 'string', placement: 'string',
+  }, {}, { enums: { trigger: POPOVER_TRIGGERS, placement: POPOVER_PLACEMENTS } }),
   // Both sides are required: a "compare" with one side is a single image, and
   // dropping the pair silently would leave a half-labelled figure.
   // A decision list: options carry a cost, so the reader can choose instead of

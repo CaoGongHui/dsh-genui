@@ -21,7 +21,7 @@ import type { GenuiWhen, GenuiComparePanel, GenuiComputed, GenuiComputedFormat, 
 import { isComponentRoot, wrapSingleComponentRoot } from './spec.ts'
 import {
   BADGE_TONES, BUTTON_TONES, CALLOUT_TONES, CARD_TONES, CHART_KINDS, CHOICE_MODES, COMPARE_MODES, COMPONENT_SCHEMAS, HERO_TONES, WHEN_OPS,
-  DIAGRAM_EDGE_KINDS, DIAGRAM_KINDS, DIAGRAM_NODE_TYPES, DIAGRAM_ROUTES, DIAGRAM_VARIANTS,
+  DIAGRAM_EDGE_KINDS, DIAGRAM_KINDS, DIAGRAM_NODE_TYPES, DIAGRAM_ROUTES, DIAGRAM_VARIANTS, POPOVER_PLACEMENTS, POPOVER_TRIGGERS,
   DATE_PICKER_MODES, ECHART_PRESETS, FILE_TYPES, GENUI_NATIVE_TYPES, GENUI_SPEC_SCHEMA, INPUT_TYPES, getComponentSchema,
   ARROW_DIRS, BLOCKS_VARIANTS, BLOCK_CELL_TONES, ICON_TONES, MEDIA_ASPECT_RATIOS, MESH_SHAPES, PLOT_KINDS, PROGRESS_VARIANTS, ROW_JUSTIFY, TABLE_CELL_TYPES, TEXT_ALIGNS, TEXT_SIZES, TEXT_TONES,
 } from './genui-runtime/schema.ts'
@@ -157,6 +157,8 @@ function validateNestedRecordSchemas(
     if (Array.isArray(nestedValue)) {
       const records = value.type === 'image-group' && field === 'items'
         ? nestedValue.slice(0, GENUI_LIMITS.maxImageGroupItems)
+        : value.type === 'entity-card' && field === 'metadata' ? nestedValue.slice(0, GENUI_LIMITS.maxEntityMetadata)
+        : value.type === 'entity-card' && field === 'actions' ? nestedValue.slice(0, GENUI_LIMITS.maxEntityActions)
         : value.type === 'map' && field === 'locations' ? nestedValue.slice(0, GENUI_LIMITS.maxMapLocations)
         : value.type === 'map' && field === 'routes' ? nestedValue.slice(0, GENUI_LIMITS.maxMapRoutes)
         : field === 'computed' ? nestedValue.slice(0, GENUI_LIMITS.maxComputedFields) : nestedValue
@@ -412,6 +414,57 @@ function repairNodeFields(value: unknown, ctx: RepairCtx, depth: number): GenuiN
         return [{ src, ...opt('alt', str(item.alt, GENUI_LIMITS.maxString)), ...opt('caption', str(item.caption, GENUI_LIMITS.maxString)) }]
       })
       return { type: 'image-group', items, ...opt('title', str(v.title, GENUI_LIMITS.maxString)) }
+    }
+    case 'editor': {
+      const id = str(v.id, 200)
+      const value = str(v.value, GENUI_LIMITS.maxEditorChars)
+      if (id === undefined || value === undefined) return null
+      return {
+        type: 'editor', id, value,
+        ...opt('label', str(v.label, GENUI_LIMITS.maxString)),
+        ...opt('placeholder', str(v.placeholder, GENUI_LIMITS.maxString)),
+        ...opt('rows', int(v.rows, 3, 24)),
+      }
+    }
+    case 'entity-card': {
+      const name = str(v.name, GENUI_LIMITS.maxString)
+      if (name === undefined) return null
+      const metadata = Array.isArray(v.metadata) ? v.metadata.slice(0, GENUI_LIMITS.maxEntityMetadata).flatMap(entry => {
+        const record = obj(entry)
+        const label = str(record?.label, 120)
+        const value = str(record?.value, GENUI_LIMITS.maxString)
+        return label === undefined || value === undefined ? [] : [{ label, value }]
+      }) : undefined
+      const actions = Array.isArray(v.actions) ? v.actions.slice(0, GENUI_LIMITS.maxEntityActions).flatMap(entry => {
+        const record = obj(entry)
+        const label = str(record?.label, 120)
+        const action = str(record?.action, 200)
+        if (label === undefined || action === undefined) return []
+        return [{ label, action, ...opt('tone', enu(record?.tone, BUTTON_TONES)) }]
+      }) : undefined
+      const image = safeMediaSrc(v.image)
+      const hrefTarget = classifyLinkTarget(v.href)
+      const href = hrefTarget.type === 'external' ? hrefTarget.href : hrefTarget.type === 'file' ? String(v.href).trim() : undefined
+      return {
+        type: 'entity-card', name,
+        ...opt('image', image),
+        ...opt('imageAlt', str(v.imageAlt, GENUI_LIMITS.maxString)),
+        ...opt('description', str(v.description, GENUI_LIMITS.maxString)),
+        ...opt('metadata', metadata),
+        ...opt('href', href),
+        ...opt('sourceLabel', str(v.sourceLabel, 120)),
+        ...opt('actions', actions),
+      }
+    }
+    case 'popover': {
+      const label = str(v.label, 200)
+      const content = str(v.content, GENUI_LIMITS.maxString)
+      if (label === undefined || content === undefined) return null
+      return {
+        type: 'popover', label, content,
+        ...opt('trigger', enu(v.trigger, POPOVER_TRIGGERS)),
+        ...opt('placement', enu(v.placement, POPOVER_PLACEMENTS)),
+      }
     }
     case 'choices': {
       const source = Array.isArray(v.items) ? v.items.slice(0, 8) : []
@@ -2572,6 +2625,16 @@ function validateNode(value: unknown, depth: number, at: string, errors: string[
       break
     case 'copy':
       if (typeof v.text !== 'string') errors.push(`${at}: type 'copy' requires text (string)`)
+      break
+    case 'editor':
+      if (typeof v.id !== 'string' || typeof v.value !== 'string') errors.push(`${at}: type 'editor' requires id and value (strings)`)
+      else if (v.value.length > GENUI_LIMITS.maxEditorChars) errors.push(`${at}.value exceeds editor limit ${GENUI_LIMITS.maxEditorChars}`)
+      break
+    case 'entity-card':
+      if (typeof v.name !== 'string') errors.push(`${at}: type 'entity-card' requires name (string)`)
+      break
+    case 'popover':
+      if (typeof v.label !== 'string' || typeof v.content !== 'string') errors.push(`${at}: type 'popover' requires label and content (strings)`)
       break
     case 'svg':
       if (typeof v.code !== 'string') errors.push(`${at}: type 'svg' requires code (string)`)
