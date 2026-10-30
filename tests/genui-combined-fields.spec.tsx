@@ -60,6 +60,28 @@ describe('combined diagram, segmented control and date state', () => {
     expect(payloads[0]?.fields).toEqual({ show: 'yes' })
   })
 
+  it('keeps an editor draft behind the date chain and preserves an explicit clear', () => {
+    const payloads: Record<string, unknown>[] = []
+    const withEditor: GenuiSpec = { items: [
+      { type: 'editor', id: 'notes', label: 'Notes', value: 'Default', when: { field: 'visit', op: 'not-empty' } },
+      ...spec.items,
+    ] }
+    render(<GenuiActionContext.Provider value={(_action, payload) => payloads.push(payload)}>
+      <GenuiBlock spec={withEditor} initialState={{ fields: { ...restored.fields, notes: 'Saved draft' } }} />
+    </GenuiActionContext.Provider>)
+    expect(screen.queryByLabelText('Notes')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(payloads[0]?.fields).toEqual({ show: 'no' })
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'yes' } })
+    expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe('Saved draft')
+    fireEvent.change(screen.getByLabelText('Notes'), { target: { value: '' } })
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'no' } })
+    fireEvent.change(screen.getByLabelText('Show'), { target: { value: 'yes' } })
+    expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe('')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(payloads[1]?.fields).toEqual({ ...restored.fields, show: 'yes' })
+  })
+
   it('rejects cycles through the new fields, including ancestor conditions', () => {
     const result = processGenuiSpec({ items: [
       { type: 'card', when: { field: 'visit', op: 'not-empty' }, items: [

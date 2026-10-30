@@ -197,6 +197,11 @@ jobs:
         env:
           BROWSER_BIN: google-chrome
 
+      - name: Check native interaction state in real browser
+        run: node scripts/check-interaction-state-browser.mjs
+        env:
+          BROWSER_BIN: google-chrome
+
       - name: Archive newline browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -206,6 +211,7 @@ jobs:
             .e2e-artifacts/text-newlines/
             .e2e-artifacts/table-wrap/
             .e2e-artifacts/blocks-theme/
+            .e2e-artifacts/interaction-state/
           if-no-files-found: ignore
 
   windows-pack:
