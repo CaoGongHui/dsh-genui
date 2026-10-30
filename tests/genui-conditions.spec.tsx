@@ -18,6 +18,14 @@ const state = (fields: Record<string, string> = {}, answers: Record<string, stri
   ({ fields, answers, multiAnswers })
 
 describe('evaluateWhen', () => {
+  it.each(['constructor', 'toString', '__proto__'])('treats an unset prototype-named field %s as empty', field => {
+    expect(evaluateWhen({ field, op: 'eq', value: 'ready' }, EMPTY)).toBe(false)
+    expect(evaluateWhen({ field, op: 'not-empty' }, EMPTY)).toBe(false)
+    expect(evaluateWhen({ field, op: 'eq', value: 'ready' }, state({ [field]: 'ready' }))).toBe(true)
+    expect(evaluateWhen({ field, op: 'eq', value: 'ready' }, state({}, { [field]: 'ready' }))).toBe(true)
+    expect(evaluateWhen({ field, op: 'eq', value: 'ready' }, state({}, {}, { [field]: ['ready'] }))).toBe(true)
+  })
+
   it('compares a field value for eq / neq', () => {
     expect(evaluateWhen({ field: 'entity', op: 'eq', value: '公司' }, state({ entity: '公司' }))).toBe(true)
     expect(evaluateWhen({ field: 'entity', op: 'eq', value: '公司' }, state({ entity: '个人' }))).toBe(false)
