@@ -125,7 +125,7 @@ describe('segmented-control component', () => {
     ] }
     render(<GenuiBlock spec={spec} initialState={{ fields: { visibility: 'Hide', travel: '2026-10-20' } }} />)
     expect(screen.queryByText('Date selected')).toBeNull()
-    expect(screen.queryByLabelText('Date')).toBeNull()
+    expect(document.querySelector('input[type="date"]')).toBeNull()
   })
 
   it('submits a restored value when a hidden dependency makes its condition empty', () => {
