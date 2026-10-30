@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GenuiActionContext } from '../src/client/action-context.ts'
 import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
+import { collectHiddenKeys } from '../src/client/conditions.ts'
 import { validateGenuiSpec } from '../src/client/guard.ts'
 import type { GenuiSpec } from '../src/client/spec.ts'
 
@@ -64,6 +65,23 @@ describe('segmented-control component', () => {
     fireEvent.click(screen.getByRole('radio', { name: 'Show' }))
     expect(screen.getByLabelText('View')).toBeTruthy()
     expect(screen.getByText('Map details')).toBeTruthy()
+  })
+
+  it('bounds circular visibility evaluation and excludes unstable fields', () => {
+    const items: GenuiSpec['items'] = [
+      { type: 'input', id: 'a', value: '1', when: { field: 'b', op: 'empty' } },
+      { type: 'input', id: 'b', value: '1', when: { field: 'a', op: 'empty' } },
+    ]
+    const hidden = collectHiddenKeys(items, {
+      fields: { a: '1', b: '1' }, answers: {}, multiAnswers: {},
+    })
+    expect([...hidden].sort()).toEqual(['a', 'b'])
+    const view = render(<GenuiBlock
+      spec={{ items: [...items, { type: 'submit', label: 'Send', action: 'send' }] }}
+      initialState={{ fields: { a: '1', b: '1' } }}
+    />)
+    expect(view.container.querySelector('[data-genui]')).not.toBeNull()
+    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
   it('submits a restored value when a hidden dependency makes its condition empty', () => {

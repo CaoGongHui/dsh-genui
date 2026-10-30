@@ -24,6 +24,7 @@
  * @module conditions
  */
 import type { GenuiWhen } from './spec.ts'
+import { GENUI_LIMITS } from './genui-runtime/index.ts'
 
 /** The slice of block state a condition can read. */
 export interface ConditionState {
@@ -161,14 +162,19 @@ export function collectHiddenKeys(items: unknown, state: ConditionState): Readon
   const seed = new Set(state.conditionHidden ?? [])
   let hidden = new Set(seed)
   const seen = new Set<string>()
-  while (true) {
+  const conservativeHidden = new Set(seed)
+  // Guard 层会拒绝循环依赖。直接调用渲染器时，采用保守的隐藏结果，
+  // 保证非法条件不会使整条消息抛出异常，也不会提交循环中的旧字段值。
+  for (let pass = 0; pass <= GENUI_LIMITS.maxNodes; pass += 1) {
     const signature = JSON.stringify([...hidden].sort())
-    if (seen.has(signature)) throw new Error('GenUI when conditions do not converge to a stable visibility state')
+    if (seen.has(signature)) return conservativeHidden
     seen.add(signature)
     const next = new Set([...seed, ...collectPass(hidden)])
     if (next.size === hidden.size && [...next].every(key => hidden.has(key))) return next
+    for (const key of next) conservativeHidden.add(key)
     hidden = next
   }
+  return conservativeHidden
 }
 
 /** Add every id/group under a subtree (used when a container is hidden). */
