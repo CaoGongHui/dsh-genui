@@ -65,7 +65,7 @@ export function PopoverNode({ node }: { node: GenuiPopover }): ReactElement {
     }
     syncTheme()
     const observer = new MutationObserver(syncTheme)
-    for (let element: HTMLElement | null = reference; element !== null; element = element.parentElement) {
+    for (let element: Element | null = reference; element !== null; element = element.parentElement) {
       observer.observe(element, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-ds-dark-theme'] })
     }
     return () => observer.disconnect()

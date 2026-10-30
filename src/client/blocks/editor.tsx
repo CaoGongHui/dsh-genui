@@ -69,7 +69,7 @@ export function EditorNode({ node, answers }: { node: GenuiEditor; answers?: Ans
         onChange={event => updateValue(event.currentTarget.value)}
         aria-describedby={`${labelId}-status`}
       />
-      <span id={`${labelId}-status`} className={css.visuallyHidden}>{saved ? t('block.editorSaved') : t('block.editorSaving')}</span>
+      <span id={`${labelId}-status`} className={css.visuallyHidden}>{t(edited ? 'block.editorSaved' : 'block.editorSaving')}</span>
     </section>
   )
 }
