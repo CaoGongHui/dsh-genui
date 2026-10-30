@@ -51,7 +51,7 @@ export function PopoverNode({ node }: { node: GenuiPopover }): ReactElement {
   // 同时监听祖先主题变化，保证弹层打开期间切换主题仍能更新颜色。
   useLayoutEffect(() => {
     if (!open) return
-    const reference = refs.reference.current
+    const reference = refs.domReference.current
     const floating = refs.floating.current
     if (reference === null || floating === null) return
     const tokens = ['--dsl-g-surface', '--dsl-g-border', '--dsl-g-accent', '--dsl-g-hover', '--dsl-g-link']
