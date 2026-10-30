@@ -106,6 +106,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     const secret = new Set<string>()
     const declared = new Set<string>()
     const mapOptions = new Map<string, Set<string>>()
+    const segmentedDefaults = new Map<string, string>()
     const datePickers = new Map<string, { mode: 'single' | 'range'; min?: string; max?: string }>()
     walkGenuiNodes(spec, node => {
       if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'date-picker' || node.type === 'segmented-control') && node.id !== undefined) declared.add(node.id)
@@ -117,12 +118,13 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
       }
       if (node.type === 'segmented-control' && node.id !== undefined) {
         mapOptions.set(node.id, new Set(node.options))
+        if (node.value !== undefined && node.options.includes(node.value)) segmentedDefaults.set(node.id, node.value)
       }
       if (node.type !== 'input' || node.id === undefined) return
       if (node.inputType === 'number') numeric.add(node.id)
       if (node.inputType === 'password') secret.add(node.id)
     })
-    return { numeric, secret, declared, mapOptions, datePickers }
+    return { numeric, secret, declared, mapOptions, datePickers, segmentedDefaults }
   }, [spec])
   const secretFields = fieldKinds.secret
   // 输入草稿始终归属于字段；计算使用最近的有效数字，提交与保存使用草稿值。
@@ -137,7 +139,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     .map(([id, value]) => {
       const datePicker = fieldKinds.datePickers.get(id)
       if (datePicker !== undefined && value !== '' && !isDatePickerValueValid(value, datePicker.mode, datePicker.min, datePicker.max)) return [id, '']
-      return [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? '' : value]
+      return [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? (fieldKinds.segmentedDefaults.get(id) ?? '') : value]
     })), [fieldState.fields, fieldKinds, secretFields])
   // 替换内容可能沿用表单标识并移除字段；已移除字段不能进入草稿、导出或后续提交。
   useEffect(() => {
@@ -146,7 +148,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
         .map(([id, value]): [string, string] => {
           const datePicker = fieldKinds.datePickers.get(id)
           if (datePicker !== undefined && value !== '' && !isDatePickerValueValid(value, datePicker.mode, datePicker.min, datePicker.max)) return [id, '']
-          return [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? '' : value]
+          return [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? (fieldKinds.segmentedDefaults.get(id) ?? '') : value]
         })
       if (entries.length === Object.keys(prev.fields).length && entries.every(([id, value]) => prev.fields[id] === value)) return prev
       return { fields: Object.fromEntries(entries), numericValues: Object.fromEntries(Object.entries(prev.numericValues)

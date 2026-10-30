@@ -20,11 +20,18 @@ export function SegmentedControlNode({ node, onAction, answers }: {
     ? restored
     : node.value !== undefined && options.includes(node.value) ? node.value : ''
   const [localValue, setLocalValue] = useState(initial)
+  const validDefault = node.value !== undefined && options.includes(node.value) ? node.value : ''
   const value = id === undefined ? localValue : (answers?.fields[id] ?? localValue)
 
   useEffect(() => {
     if (id !== undefined && restored === undefined && initial !== '') answers?.setField(id, initial)
   }, [])
+
+  // 无共享字段时，流式更换选项也必须移除失效的本地选择。
+  useEffect(() => {
+    if (id !== undefined && answers !== undefined) return
+    setLocalValue(previous => previous !== '' && !options.includes(previous) ? validDefault : previous)
+  }, [id, answers, options, validDefault])
 
   useEffect(() => {
     if (id !== undefined && value !== '' && !options.includes(value)) answers?.setField(id, '')

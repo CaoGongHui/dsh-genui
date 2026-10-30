@@ -84,6 +84,50 @@ describe('segmented-control component', () => {
     expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('uses the updated legal default when streaming replaces all options', () => {
+    const oldSpec: GenuiSpec = { items: [
+      { type: 'segmented-control', label: 'Mode', id: 'mode', options: ['A', 'B'], value: 'A' },
+      { type: 'submit', label: 'Send', action: 'send', groups: ['mode'] },
+    ] }
+    const actions: Record<string, unknown>[] = []
+    const onAction = (_name: string, payload: Record<string, unknown>): void => { actions.push(payload) }
+    const view = render(<GenuiActionContext.Provider value={onAction}>
+      <GenuiBlock spec={oldSpec} />
+    </GenuiActionContext.Provider>)
+    expect((screen.getByRole('radio', { name: 'A' }) as HTMLInputElement).checked).toBe(true)
+    view.rerender(<GenuiActionContext.Provider value={onAction}>
+      <GenuiBlock spec={{ items: [
+        { type: 'segmented-control', label: 'Mode', id: 'mode', options: ['C', 'D'], value: 'C' },
+        oldSpec.items[1]!,
+      ] }} />
+    </GenuiActionContext.Provider>)
+    expect((screen.getByRole('radio', { name: 'C' }) as HTMLInputElement).checked).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(actions[0]?.fields).toEqual({ mode: 'C' })
+  })
+
+  it('keeps a still-valid user selection during option updates', () => {
+    const spec: GenuiSpec = { items: [{ type: 'segmented-control', label: 'Mode', id: 'mode', options: ['A', 'B'], value: 'A' }] }
+    const view = render(<GenuiBlock spec={spec} />)
+    fireEvent.click(screen.getByRole('radio', { name: 'B' }))
+    view.rerender(<GenuiBlock spec={{ items: [{ type: 'segmented-control', label: 'Mode', id: 'mode', options: ['B', 'C'], value: 'C' }] }} />)
+    expect((screen.getByRole('radio', { name: 'B' }) as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('excludes hidden dates nested inside tabs from sibling conditions and submit', () => {
+    const spec: GenuiSpec = { items: [
+      { type: 'segmented-control', id: 'visibility', options: ['Show', 'Hide'], value: 'Hide' },
+      { type: 'tabs', tabs: [{ label: 'Date', items: [
+        { type: 'date-picker', id: 'travel', when: { field: 'visibility', op: 'eq', value: 'Show' } },
+      ] }] },
+      { type: 'text', content: 'Date selected', when: { field: 'travel', op: 'not-empty' } },
+      { type: 'submit', label: 'Send', action: 'send', groups: ['travel'] },
+    ] }
+    render(<GenuiBlock spec={spec} initialState={{ fields: { visibility: 'Hide', travel: '2026-10-20' } }} />)
+    expect(screen.queryByText('Date selected')).toBeNull()
+    expect(screen.queryByLabelText('Date')).toBeNull()
+  })
+
   it('submits a restored value when a hidden dependency makes its condition empty', () => {
     const actions: Array<[string, Record<string, unknown>]> = []
     const spec: GenuiSpec = { items: [
