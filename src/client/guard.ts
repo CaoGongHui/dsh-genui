@@ -1718,10 +1718,12 @@ function deferPanelReferences(spec: GenuiSpec, options: GenuiValidationOptions):
  * @returns 循环依赖错误列表。
  */
 function validateWhenDependencyCycles(spec: GenuiSpec): string[] {
+  // 共享 submission registry 决定字段身份：新增的可提交控件自动参与循环检查。
+  const registry = analyzeSubmissionRegistry(spec).registry
   const dependencies = new Map<string, Array<{ field: string; path: string }>>()
   walkGenuiNodes(spec, (node, path, ancestorConditions) => {
-    const fieldId = node.type === 'input' || node.type === 'textarea' || node.type === 'select'
-      || node.type === 'slider' || node.type === 'map' || node.type === 'diagram' ? node.id : undefined
+    const fieldId = 'id' in node && typeof node.id === 'string'
+      && registry.members.get(node.id)?.kind === 'field' ? node.id : undefined
     const group = node.type === 'radio' || node.type === 'checkbox' || node.type === 'choices' ? node.group : undefined
     const key = fieldId ?? group
     if (key === undefined) return

@@ -203,6 +203,14 @@ describe('when guard', () => {
     expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
   })
 
+  it('recognizes cycles between registered input fields and diagrams', () => {
+    const result = processGenuiSpec({ items: [
+      { type: 'diagram', id: 'selected', kind: 'flowchart', nodes: [{ id: 'node', label: 'Node' }], when: { field: 'name', op: 'not-empty' } },
+      { type: 'input', id: 'name', when: { field: 'selected', op: 'not-empty' } },
+    ] })
+    expect(result.errors.join(' ')).toContain('circular visibility dependency')
+  })
+
   it('rejects circular field visibility dependencies', () => {
     const result = processGenuiSpec({ items: [
       { type: 'diagram', id: 'selection', kind: 'flowchart', nodes: [{ id: 'db', label: 'Database' }], when: { field: 'selection', op: 'empty' } },
