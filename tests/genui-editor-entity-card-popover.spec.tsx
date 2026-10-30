@@ -115,11 +115,13 @@ describe('Editor, Entity Card, and Popover', () => {
   it('shows the avatar when an entity image fails to load, and recovers for a new source', () => {
     const first: GenuiSpec = { items: [{ type: 'entity-card', name: 'Example', image: '/missing.png' }] }
     const view = render(<GenuiBlock spec={first} />)
-    fireEvent.error(screen.getByRole('img'))
-    expect(screen.queryByRole('img')).toBeNull()
+    const brokenImage = view.container.querySelector('img')
+    expect(brokenImage).not.toBeNull()
+    fireEvent.error(brokenImage!)
+    expect(view.container.querySelector('img')).toBeNull()
     expect(screen.getByText('E')).not.toBeNull()
     view.rerender(<GenuiBlock spec={{ items: [{ type: 'entity-card', name: 'Example', image: '/working.png' }] }} />)
-    expect(screen.getByRole('img').getAttribute('src')).toBe('/working.png')
+    expect(view.container.querySelector('img')?.getAttribute('src')).toBe('/working.png')
   })
 
   it('describes editor draft state without claiming persisted storage', () => {

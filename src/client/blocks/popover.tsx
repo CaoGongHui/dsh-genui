@@ -1,4 +1,4 @@
-import { useLayoutEffect, useState, type ReactElement } from 'react'
+import { useCallback, useLayoutEffect, useState, type ReactElement } from 'react'
 import {
   FloatingFocusManager,
   FloatingPortal,
@@ -47,29 +47,37 @@ export function PopoverNode({ node }: { node: GenuiPopover }): ReactElement {
     ],
     whileElementsMounted: autoUpdate,
   })
-  // Portal 挂载在 document.body 下，需要显式同步区块专属的主题变量。
-  // 同时监听祖先主题变化，保证弹层打开期间切换主题仍能更新颜色。
+  // Portal 根节点无法自动继承 .block 中定义的自定义变量。
+  // 浮层通过 ref 回调同步初始主题，并监听祖先属性变化以支持实时切换。
+  const syncTheme = useCallback((floating: HTMLElement): void => {
+    const reference = refs.domReference.current
+    if (reference === null) return
+    const source = getComputedStyle(reference)
+    for (const name of ['--dsl-g-surface', '--dsl-g-border', '--dsl-g-accent', '--dsl-g-hover', '--dsl-g-link']) {
+      const value = source.getPropertyValue(name).trim()
+      if (value !== '') floating.style.setProperty(name, value)
+      else floating.style.removeProperty(name)
+    }
+  }, [refs.domReference])
+  const setFloating = useCallback((element: HTMLElement | null): void => {
+    refs.setFloating(element)
+    if (element !== null) syncTheme(element)
+  }, [refs.setFloating, syncTheme])
   useLayoutEffect(() => {
     if (!open) return
     const reference = refs.domReference.current
-    const floating = refs.floating.current
-    if (reference === null || floating === null) return
-    const tokens = ['--dsl-g-surface', '--dsl-g-border', '--dsl-g-accent', '--dsl-g-hover', '--dsl-g-link']
-    const syncTheme = (): void => {
-      const source = getComputedStyle(reference)
-      for (const name of tokens) {
-        const value = source.getPropertyValue(name).trim()
-        if (value !== '') floating.style.setProperty(name, value)
-        else floating.style.removeProperty(name)
-      }
+    if (reference === null) return
+    const refresh = (): void => {
+      const floating = refs.floating.current
+      if (floating !== null) syncTheme(floating)
     }
-    syncTheme()
-    const observer = new MutationObserver(syncTheme)
+    refresh()
+    const observer = new MutationObserver(refresh)
     for (let element: Element | null = reference; element !== null; element = element.parentElement) {
       observer.observe(element, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-ds-dark-theme'] })
     }
     return () => observer.disconnect()
-  }, [open, refs])
+  }, [open, refs, syncTheme])
 
   const click = useClick(context, { enabled: trigger === 'click' })
   const hover = useHover(context, { enabled: trigger === 'hover', handleClose: safePolygon() })
@@ -86,7 +94,7 @@ export function PopoverNode({ node }: { node: GenuiPopover }): ReactElement {
       {open && (
         <FloatingPortal>
           <FloatingFocusManager context={context} modal={false} returnFocus>
-            <div ref={refs.setFloating} className={css.panel} style={floatingStyles} {...getFloatingProps()}>
+            <div ref={setFloating} className={css.panel} style={floatingStyles} {...getFloatingProps()}>
               <div className={css.content}>{renderInline(node.content)}</div>
               <button className={css.close} type="button" aria-label={t('block.popoverClose')} onClick={() => setOpen(false)}>×</button>
             </div>
