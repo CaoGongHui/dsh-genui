@@ -21,6 +21,7 @@ import type { GenuiSpec } from './spec.ts'
 import { compileSubmissionRegistry } from './submission-registry.ts'
 import { evaluateComputed, resolveComputedSpec } from './computed.ts'
 import { parseDecimalNumber } from './safe-math.ts'
+import { isDatePickerValueValid } from './date-picker.ts'
 import { walkGenuiNodes } from './walk-spec.ts'
 import { repairMap } from './map-data.ts'
 
@@ -106,17 +107,28 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     const secret = new Set<string>()
     const declared = new Set<string>()
     const fieldOptions = new Map<string, Set<string>>()
+    const segmentedDefaults = new Map<string, string>()
+    const datePickers = new Map<string, { mode: 'single' | 'range'; min?: string; max?: string }>()
     walkGenuiNodes(spec, node => {
-      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'diagram') && node.id !== undefined) declared.add(node.id)
+      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'date-picker' || node.type === 'segmented-control' || node.type === 'diagram') && node.id !== undefined) declared.add(node.id)
+      if (node.type === 'date-picker' && node.id !== undefined) {
+        datePickers.set(node.id, { mode: node.mode ?? 'single', ...(node.min === undefined ? {} : { min: node.min }), ...(node.max === undefined ? {} : { max: node.max }) })
+      }
       if (node.type === 'map' && node.id !== undefined) {
         fieldOptions.set(node.id, new Set(repairMap(node)?.locations.map(location => location.id)))
       }
-      if (node.type === 'diagram' && node.id !== undefined) fieldOptions.set(node.id, new Set(node.nodes.slice(0, GENUI_LIMITS.maxDiagramNodes).map(item => item.id)))
+      if (node.type === 'segmented-control' && node.id !== undefined) {
+        fieldOptions.set(node.id, new Set(node.options))
+        if (node.value !== undefined && node.options.includes(node.value)) segmentedDefaults.set(node.id, node.value)
+      }
+      if (node.type === 'diagram' && node.id !== undefined) {
+        fieldOptions.set(node.id, new Set(node.nodes.slice(0, GENUI_LIMITS.maxDiagramNodes).map(item => item.id)))
+      }
       if (node.type !== 'input' || node.id === undefined) return
       if (node.inputType === 'number') numeric.add(node.id)
       if (node.inputType === 'password') secret.add(node.id)
     })
-    return { numeric, secret, declared, fieldOptions }
+    return { numeric, secret, declared, fieldOptions, datePickers, segmentedDefaults }
   }, [spec])
   const secretFields = fieldKinds.secret
   // 输入草稿始终归属于字段；计算使用最近的有效数字，提交与保存使用草稿值。
@@ -128,12 +140,20 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   })
   const fields = useMemo(() => Object.fromEntries(Object.entries(fieldState.fields)
     .filter(([id]) => fieldKinds.declared.has(id) && !secretFields.has(id))
-    .map(([id, value]) => [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? '' : value])), [fieldState.fields, fieldKinds, secretFields])
+    .map(([id, value]) => {
+      const datePicker = fieldKinds.datePickers.get(id)
+      if (datePicker !== undefined && value !== '' && !isDatePickerValueValid(value, datePicker.mode, datePicker.min, datePicker.max)) return [id, '']
+      return [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? (fieldKinds.segmentedDefaults.get(id) ?? '') : value]
+    })), [fieldState.fields, fieldKinds, secretFields])
   // 替换内容可能沿用表单标识并移除字段；已移除字段不能进入草稿、导出或后续提交。
   useEffect(() => {
     setFieldState(prev => {
       const entries = Object.entries(prev.fields).filter(([id]) => fieldKinds.declared.has(id) && !secretFields.has(id))
-        .map(([id, value]): [string, string] => [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? '' : value])
+        .map(([id, value]): [string, string] => {
+          const datePicker = fieldKinds.datePickers.get(id)
+          if (datePicker !== undefined && value !== '' && !isDatePickerValueValid(value, datePicker.mode, datePicker.min, datePicker.max)) return [id, '']
+          return [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? (fieldKinds.segmentedDefaults.get(id) ?? '') : value]
+        })
       if (entries.length === Object.keys(prev.fields).length && entries.every(([id, value]) => prev.fields[id] === value)) return prev
       return { fields: Object.fromEntries(entries), numericValues: Object.fromEntries(Object.entries(prev.numericValues)
         .filter(([id]) => fieldKinds.numeric.has(id) && !secretFields.has(id))) }
@@ -163,32 +183,10 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   // Field ids / answer groups hidden by a `when` condition right now. Submit
   // uses this to drop their values and their required-status: a hidden control
   // must not submit a stale value, nor block submission by looking unanswered.
-  const hiddenKeys = useMemo(() => {
-    let hidden = new Set<string>()
-    const seen = new Set<string>()
-    const conservativeHidden = new Set<string>()
-    for (let pass = 0; pass <= GENUI_LIMITS.maxNodes; pass += 1) {
-      const current = {
-        fields: Object.fromEntries(Object.entries(fields).filter(([id]) => !hidden.has(id))),
-        answers: Object.fromEntries(Object.entries(answers).filter(([id]) => !hidden.has(id))),
-        multiAnswers: Object.fromEntries(Object.entries(multiAnswers).filter(([id]) => !hidden.has(id))),
-      }
-      const next = collectHiddenKeys(computedSpec.items, current)
-      if (next.size === hidden.size && [...next].every(id => hidden.has(id))) return next
-      for (const id of next) conservativeHidden.add(id)
-      const signature = [...next].sort().join('\u0000')
-      // Direct GenuiBlock callers may supply a spec that bypassed validation.
-      // A cycle must not crash the entire conversation; suppress every field
-      // involved in an unstable visibility pass instead.
-      if (seen.has(signature)) return conservativeHidden
-      seen.add(signature)
-      hidden = new Set(next)
-    }
-    return conservativeHidden
-  }, [computedSpec, fields, answers, multiAnswers])
-  const visibleFields = useMemo(() => Object.fromEntries(Object.entries(fields).filter(([id]) => !hiddenKeys.has(id))), [fields, hiddenKeys])
-  const visibleAnswers = useMemo(() => Object.fromEntries(Object.entries(answers).filter(([id]) => !hiddenKeys.has(id))), [answers, hiddenKeys])
-  const visibleMultiAnswers = useMemo(() => Object.fromEntries(Object.entries(multiAnswers).filter(([id]) => !hiddenKeys.has(id))), [multiAnswers, hiddenKeys])
+  const hiddenKeys = useMemo(
+    () => collectHiddenKeys(computedSpec.items, { fields, answers, multiAnswers }),
+    [computedSpec, fields, answers, multiAnswers],
+  )
   const setAnswer = useCallback((group: string, choice: string) => {
     setAnswers(prev => (prev[group] === choice ? prev : { ...prev, [group]: choice }))
   }, [])
@@ -239,10 +237,10 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   }, [])
   const answersState = useMemo<AnswersState>(
     () => ({
-      answers: visibleAnswers, multiAnswers: visibleMultiAnswers, fields: visibleFields, secretFields, invalidNumericFields, hidden: hiddenKeys, registry: submissionRegistry, locked, round,
+      answers, multiAnswers, fields, secretFields, invalidNumericFields, hidden: hiddenKeys, conditionHidden: hiddenKeys, registry: submissionRegistry, locked, round,
       setAnswer, setMultiAnswer, setField, clear, setLocked,
     }),
-    [visibleAnswers, visibleMultiAnswers, visibleFields, secretFields, invalidNumericFields, hiddenKeys, submissionRegistry, locked, round, setAnswer, setMultiAnswer, setField, clear],
+    [answers, multiAnswers, fields, secretFields, invalidNumericFields, hiddenKeys, submissionRegistry, locked, round, setAnswer, setMultiAnswer, setField, clear],
   )
   const durableState = useMemo(() => {
     const safeFields = Object.fromEntries(Object.entries(fields).filter(([id]) => !secretFields.has(id)))

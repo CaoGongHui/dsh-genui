@@ -58,6 +58,8 @@ export type GenuiNode = (
   | GenuiButton
   | GenuiInput
   | GenuiSelect
+  | GenuiDatePicker
+  | GenuiSegmentedControl
   | GenuiCheckbox
   | GenuiLink
   | GenuiImage
@@ -244,6 +246,29 @@ export interface GenuiSelect {
    * input/textarea ids.
    */
   id?: string
+}
+
+/** 使用 ISO 日期或 ISO 日期区间的原生日期控件。 */
+export interface GenuiDatePicker {
+  type: 'date-picker'
+  label?: string
+  mode?: 'single' | 'range'
+  /** 单日期使用 ISO 日期；范围模式使用 `start/end` 两个 ISO 日期。 */
+  value?: string
+  min?: string
+  max?: string
+  /** 供共享状态和 submit 使用的字段标识。 */
+  id?: string
+}
+
+/** 可通过共享选中值更新同级组件的单选控件。 */
+export interface GenuiSegmentedControl {
+  type: 'segmented-control'
+  label?: string
+  options: string[]
+  value?: string
+  id?: string
+  action?: string
 }
 
 /** 保存计算后复选框显示文案对应的运行时身份。 */

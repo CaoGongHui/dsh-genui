@@ -387,6 +387,13 @@ export const ZH: Record<keyof typeof EN, string> = {
   'block.choices.count': '已选 {count} 项',
   'block.choices.localOnly': '只在本地记录 · 没有发送',
   'block.choices.sent': '已发送 · 仍可修改',
+  'block.datePicker.start': '开始日期',
+  'block.datePicker.end': '结束日期',
+  'block.datePicker.date': '日期',
+  'block.datePicker.range': '日期范围',
+  'block.datePicker.invalidRange': '结束日期不能早于开始日期。',
+  'block.datePicker.invalidDate': '日期必须处于可选范围内。',
+  'block.segmentedControl': '选择一个选项',
 
   // -------------------------------------------------------- error text
   'err.boundary.generic': '此界面',

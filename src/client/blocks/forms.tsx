@@ -9,6 +9,7 @@ import css from '../GenuiBlock.module.css'
 import { GENUI_LIMITS } from '../genui-runtime/index.ts'
 import { useT } from '../i18n/index.ts'
 import { parseDecimalNumber } from '../safe-math.ts'
+import { isDatePickerValueValid } from '../date-picker.ts'
 import { resolveSubmitState } from '../submission-registry.ts'
 import type { RadioSubmissionMember } from '../submission-registry.ts'
 import type { AnswersState, GenuiBlockProps } from './state.ts'
@@ -101,7 +102,12 @@ export function SubmitNode({ node, onAction, answers }: {
   // One shared notion of "filled fields" for answered/ready/payload: non-blank
   // values only, secrets (password inputs) never collected into submit.
   const filledFields = Object.fromEntries(
-    Object.entries(validFields).filter(([id, v]) => v.trim() !== '' && !answers?.secretFields.has(id)),
+    Object.entries(validFields).filter(([id, v]) => {
+      if (v.trim() === '' || answers?.secretFields.has(id)) return false
+      const member = answers?.registry.members.get(id)
+      return member?.kind !== 'field' || member.fieldType !== 'date-picker'
+        || isDatePickerValueValid(v, member.datePicker?.mode ?? 'single', member.datePicker?.min, member.datePicker?.max)
+    }),
   )
   const resolved = answers === undefined ? { scope: [], answered: 0, total: expected?.length ?? 0, localGradeEligible: false, hasOutOfScopePayload: false }
     : resolveSubmitState({
