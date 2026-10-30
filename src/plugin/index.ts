@@ -158,17 +158,31 @@ function frontmatterField(front: string, key: string): string | undefined {
   return line?.[1]?.replace(/^['"]|['"]$/gu, '')
 }
 
+/**
+ * Parse the bundled SKILL.md after normalising line endings.
+ *
+ * `pnpm pack` on a Windows checkout with `core.autocrlf=true` can ship a CRLF
+ * file. The strict `---\n` check below would then throw while the skill catalog
+ * is assembled, and the whole genui skill disappears from the panel with no
+ * other symptom. Normalising here keeps the loader independent of the host
+ * that produced the tarball.
+ */
+export function parseBundledSkill(raw: string): { description: string; content: string } {
+  const text = raw.replace(/\r\n?/g, '\n')
+  const end = text.indexOf('\n---\n', 4)
+  if (!text.startsWith('---\n') || end < 0) throw new Error('genui SKILL.md has invalid frontmatter')
+  const description = frontmatterField(text.slice(4, end), 'description')
+  if (description === undefined) throw new Error('genui SKILL.md frontmatter has no description')
+  return { description, content: text.slice(end + 5) }
+}
+
 /** Register through the provider path so source=bundled also gets bundled precedence. */
 function bundledSkillProvider(): SkillProvider {
   const moduleDirectory = dirname(fileURLToPath(new URL(import.meta.url)))
   const path = basename(moduleDirectory) === 'plugin'
     ? resolve(moduleDirectory, '../../SKILL.md')
     : resolve(moduleDirectory, '../SKILL.md')
-  const raw = readFileSync(path, 'utf8')
-  const end = raw.indexOf('\n---\n', 4)
-  if (!raw.startsWith('---\n') || end < 0) throw new Error('genui SKILL.md has invalid frontmatter')
-  const description = frontmatterField(raw.slice(4, end), 'description')
-  if (description === undefined) throw new Error('genui SKILL.md frontmatter has no description')
+  const { description, content } = parseBundledSkill(readFileSync(path, 'utf8'))
   return {
     name: BUNDLED_SKILL_PROVIDER,
     list: () => Promise.resolve([{
@@ -190,7 +204,7 @@ function bundledSkillProvider(): SkillProvider {
       provider: BUNDLED_SKILL_PROVIDER,
       path,
       resourceBase: { kind: 'directory', path: dirname(path) },
-      content: raw.slice(end + 5),
+      content,
     }),
   }
 }

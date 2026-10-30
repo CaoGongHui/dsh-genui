@@ -378,6 +378,22 @@ describe('genui:fence section', () => {
     expect(await ctx.skills.get('genui')).toBeDefined()
   })
 
+  it('normalizes a CRLF-packed SKILL.md before parsing the frontmatter', () => {
+    // 0.14.0-pele shipped a CRLF SKILL.md from a Windows pack: the strict
+    // `---\n` check threw while the catalog was assembled and the skill
+    // silently vanished. The loader must accept either line ending.
+    const crlf = '---\r\nname: genui\r\ndescription: "test description"\r\n---\r\nbody line\r\n'
+    expect(GenUI.parseBundledSkill(crlf)).toEqual({
+      description: 'test description',
+      content: 'body line\n',
+    })
+    const lf = '---\nname: genui\ndescription: "test description"\n---\nbody line\n'
+    expect(GenUI.parseBundledSkill(lf)).toEqual({
+      description: 'test description',
+      content: 'body line\n',
+    })
+  })
+
   it('keeps the fence channel without a tools service', async () => {
     const ctx = new Context()
     await ctx.plugin(SystemPrompt)
