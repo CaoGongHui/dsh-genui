@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { cleanup, fireEvent, render, rerender, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GenuiActionContext } from '../src/client/action-context.ts'
 import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
@@ -19,6 +19,10 @@ describe('date-picker component', () => {
 
   it.each([
     { mode: 'single', value: '2026-02-30' },
+    { mode: 'single', value: '0000-01-01' },
+    { mode: 'single', min: '0000-01-01' },
+    { mode: 'single', max: '0000-12-31' },
+    { mode: 'range', value: '0000-01-01/2026-10-12' },
     { mode: 'single', value: '2026-10-12', min: '2026-10-13' },
     { mode: 'single', min: '2026-11-01', max: '2026-10-01' },
     { mode: 'range', value: '2026-10-18/2026-10-12' },
@@ -140,5 +144,62 @@ describe('date-picker component', () => {
     expect(screen.getByLabelText('Travel')).toBeTruthy()
     expect(screen.getByLabelText('Return')).toBeTruthy()
     expect(screen.getByText('Travel plan ready')).toBeTruthy()
+  })
+})
+
+
+describe('date-picker state regressions', () => {
+  it.each(['constructor', 'toString', '__proto__'])('uses only own stored fields for %s', id => {
+    const spec: GenuiSpec = { items: [
+      { type: 'date-picker', id, label: 'Date', value: '2026-10-12' },
+      { type: 'submit', label: 'Send', action: 'send', groups: [id] },
+    ] }
+    expect(validateGenuiSpec(spec).ok).toBe(true)
+    const events: Record<string, unknown>[] = []
+    render(<GenuiActionContext.Provider value={(_action, payload) => { events.push(payload) }}>
+      <GenuiBlock spec={spec} />
+    </GenuiActionContext.Provider>)
+    expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('2026-10-12')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(events[0]?.fields).toEqual({ [id]: '2026-10-12' })
+  })
+
+  it('keeps the native date input and submission empty for a restored zero year', () => {
+    const spec: GenuiSpec = { items: [
+      { type: 'date-picker', id: 'date', label: 'Date' },
+      { type: 'submit', label: 'Send', action: 'send', groups: ['date'] },
+    ] }
+    render(<GenuiActionContext.Provider value={() => undefined}>
+      <GenuiBlock spec={spec} initialState={{ fields: { date: '0000-01-01' } }} />
+    </GenuiActionContext.Provider>)
+    expect((screen.getByLabelText('Date') as HTMLInputElement).value).toBe('')
+    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
+    expect(validateGenuiSpec({ items: [{ type: 'date-picker', value: '0001-01-01' }] }).ok).toBe(true)
+    expect(validateGenuiSpec({ items: [{ type: 'date-picker', value: '2024-02-29' }] }).ok).toBe(true)
+  })
+
+  it.each(['single', 'range'] as const)('registers a displayed %s draft when updated bounds make it valid', mode => {
+    const selected = mode === 'range' ? '2026-10-20/2026-10-30' : '2026-10-30'
+    const spec: GenuiSpec = { items: [
+      { type: 'date-picker', id: 'date', label: 'Date', mode, min: '2026-10-01', max: '2026-10-22' },
+      { type: 'text', content: 'Ready', when: { field: 'date', op: 'eq', value: selected } },
+      { type: 'submit', label: 'Send', action: 'send', groups: ['date'] },
+    ] }
+    const events: Record<string, unknown>[] = []
+    const onAction = (_action: string, payload: Record<string, unknown>): void => { events.push(payload) }
+    const view = render(<GenuiActionContext.Provider value={onAction}><GenuiBlock spec={spec} /></GenuiActionContext.Provider>)
+    if (mode === 'range') fireEvent.change(screen.getByLabelText(t('block.datePicker.start')), { target: { value: '2026-10-20' } })
+    const date = screen.getByLabelText(mode === 'range' ? t('block.datePicker.end') : 'Date') as HTMLInputElement
+    fireEvent.change(date, { target: { value: '2026-10-30' } })
+    expect(date.getAttribute('aria-invalid')).toBe('true')
+    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
+    view.rerender(<GenuiActionContext.Provider value={onAction}><GenuiBlock spec={{ ...spec, items: [
+      { type: 'date-picker', id: 'date', label: 'Date', mode, min: '2026-10-01', max: '2026-10-31' }, ...spec.items.slice(1),
+    ] }} /></GenuiActionContext.Provider>)
+    expect(date.value).toBe('2026-10-30')
+    expect(date.hasAttribute('aria-invalid')).toBe(false)
+    expect(screen.getByText('Ready')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(events[0]?.fields).toEqual({ date: selected })
   })
 })

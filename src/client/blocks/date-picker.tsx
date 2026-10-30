@@ -14,7 +14,8 @@ export function DatePickerNode({ node, answers }: {
   const uid = useId()
   const id = node.id
   const range = node.mode === 'range'
-  const restored = id === undefined ? undefined : answers?.fields[id]
+  const restored = id !== undefined && answers !== undefined && Object.hasOwn(answers.fields, id)
+    ? answers.fields[id] : undefined
   const initial = restored ?? node.value ?? ''
   const validInitial = isDatePickerValueValid(initial, range ? 'range' : 'single', node.min, node.max) ? initial : ''
   const initialParts = range ? validInitial.split('/') : [validInitial]
@@ -44,6 +45,10 @@ export function DatePickerNode({ node, answers }: {
       setStart('')
       setEnd('')
       if (id !== undefined) answers?.setField(id, '')
+    } else if (id !== undefined && current !== '') {
+      // A constraint update can make a previously invalid draft valid. Keep
+      // the submitted value aligned with the date now displayed as valid.
+      answers?.setField(id, current)
     }
   }, [node.mode, node.min, node.max])
 
