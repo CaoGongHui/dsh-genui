@@ -2,8 +2,8 @@
 // Conditional visibility (`when`): a decision tree reacts to the block's own
 // state, and a hidden field must neither submit a stale value nor look
 // unanswered. Those two rules are what make it a feature rather than CSS.
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 
 import { GenuiActionContext } from '../src/client/action-context.ts'
 import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
@@ -71,6 +71,13 @@ describe('collectHiddenKeys', () => {
     expect([...collectHiddenKeys(items, state({ entity: '个人' }))].sort()).toEqual(['bankAccount', 'taxId'])
     expect([...collectHiddenKeys(items, state({ entity: '公司' }))]).toEqual([])
   })
+
+  it('does not treat hidden diagram node IDs as hidden form fields', () => {
+    const hidden = collectHiddenKeys([
+      { type: 'diagram', id: 'diagramSelection', kind: 'flowchart', nodes: [{ id: 'name', label: 'Name node' }], when: { field: 'showDiagram', op: 'eq', value: 'yes' } },
+    ], state({ showDiagram: 'no' }))
+    expect([...hidden]).toEqual(['diagramSelection'])
+  })
 })
 
 const tree: GenuiSpec = {
@@ -94,7 +101,8 @@ describe('a conditional field in a real block', () => {
   })
 
   it('does not submit a value the reader cannot see', async () => {
-    const action = vi.fn()
+    const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+    const action = (name: string, payload: Record<string, unknown>): void => { calls.push({ action: name, payload }) }
     // The block reads its handler from the plugin-owned action context.
     render(<GenuiActionContext.Provider value={action}><GenuiBlock spec={tree} /></GenuiActionContext.Provider>)
     const select = document.querySelector('select')!
@@ -103,9 +111,72 @@ describe('a conditional field in a real block', () => {
     // Hide it again: the value stays in state but must leave the payload.
     fireEvent.change(select, { target: { value: '个人' } })
     fireEvent.click(screen.getByRole('button', { name: '提交' }))
-    await vi.waitFor(() => expect(action).toHaveBeenCalled())
-    const payload = action.mock.calls[0]![1] as { fields?: Record<string, string> }
+    await waitFor(() => expect(calls).toHaveLength(1))
+    const payload = calls[0]!.payload as { fields?: Record<string, string> }
     expect(payload.fields ?? {}).not.toHaveProperty('taxId')
+  })
+
+  it('keeps a visible input value when a hidden diagram node has the same internal ID', async () => {
+    const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+    const action = (name: string, payload: Record<string, unknown>): void => { calls.push({ action: name, payload }) }
+    const spec: GenuiSpec = { items: [
+      { type: 'select', id: 'showDiagram', label: 'Show diagram', options: ['yes', 'no'] },
+      { type: 'diagram', id: 'diagramSelection', kind: 'flowchart', nodes: [{ id: 'name', label: 'Name node' }], when: { field: 'showDiagram', op: 'eq', value: 'yes' } },
+      { type: 'input', id: 'name', label: 'Name' },
+      { type: 'submit', label: 'Submit', action: 'send' },
+    ] }
+    render(<GenuiActionContext.Provider value={action}><GenuiBlock spec={spec} /></GenuiActionContext.Provider>)
+    fireEvent.change(screen.getByLabelText('Show diagram'), { target: { value: 'no' } })
+    fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Visible value' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    const payload = calls[0]!.payload as { fields?: Record<string, string> }
+    expect(payload.fields?.name).toBe('Visible value')
+  })
+
+  it('hides linked explanations and excludes a diagram selection when its tab child becomes hidden', async () => {
+    const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+    const action = (name: string, payload: Record<string, unknown>): void => { calls.push({ action: name, payload }) }
+    const spec: GenuiSpec = { items: [
+      { type: 'select', id: 'showDiagram', label: 'Show diagram', options: ['yes', 'no'] },
+      { type: 'tabs', tabs: [{ label: 'Architecture', items: [
+        { type: 'diagram', id: 'selection', kind: 'flowchart', nodes: [{ id: 'db', label: 'Database' }], when: { field: 'showDiagram', op: 'eq', value: 'yes' } },
+      ] }] },
+      { type: 'text', content: 'Database explanation', when: { field: 'selection', op: 'eq', value: 'db' } },
+      { type: 'submit', label: 'Submit', action: 'send' },
+    ] }
+    render(<GenuiActionContext.Provider value={action}><GenuiBlock spec={spec} /></GenuiActionContext.Provider>)
+    fireEvent.change(screen.getByLabelText('Show diagram'), { target: { value: 'yes' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Database' }))
+    expect(screen.getByText('Database explanation')).not.toBeNull()
+    fireEvent.change(screen.getByLabelText('Show diagram'), { target: { value: 'no' } })
+    expect(screen.queryByText('Database explanation')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    const payload = calls[0]!.payload as { fields?: Record<string, string> }
+    expect(payload.fields ?? {}).not.toHaveProperty('selection')
+  })
+
+  it('also hides dependent inputs and excludes their old values when a diagram becomes hidden', async () => {
+    const calls: Array<{ action: string; payload: Record<string, unknown> }> = []
+    const action = (name: string, payload: Record<string, unknown>): void => { calls.push({ action: name, payload }) }
+    const spec: GenuiSpec = { items: [
+      { type: 'select', id: 'showDiagram', label: 'Show diagram', options: ['yes', 'no'] },
+      { type: 'diagram', id: 'selection', kind: 'flowchart', nodes: [{ id: 'db', label: 'Database' }], when: { field: 'showDiagram', op: 'eq', value: 'yes' } },
+      { type: 'input', id: 'databaseNote', label: 'Database note', when: { field: 'selection', op: 'eq', value: 'db' } },
+      { type: 'submit', label: 'Submit', action: 'send' },
+    ] }
+    render(<GenuiActionContext.Provider value={action}><GenuiBlock spec={spec} /></GenuiActionContext.Provider>)
+    fireEvent.change(screen.getByLabelText('Show diagram'), { target: { value: 'yes' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Database' }))
+    fireEvent.change(screen.getByLabelText('Database note'), { target: { value: 'Private note' } })
+    fireEvent.change(screen.getByLabelText('Show diagram'), { target: { value: 'no' } })
+    expect(screen.queryByLabelText('Database note')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'Submit' }))
+    await waitFor(() => expect(calls).toHaveLength(1))
+    const payload = calls[0]!.payload as { fields?: Record<string, string> }
+    expect(payload.fields ?? {}).not.toHaveProperty('selection')
+    expect(payload.fields ?? {}).not.toHaveProperty('databaseNote')
   })
 })
 
@@ -119,6 +190,36 @@ describe('when guard', () => {
 
     const bad = processGenuiSpec(wrap({ type: 'text', content: 'a', when: { field: 'x', op: 'nope' } }))
     expect(bad.errors.join(' ')).toContain('when.op')
+  })
+
+  it('keeps direct GenuiBlock rendering alive for cyclic conditions', () => {
+    const spec: GenuiSpec = { items: [
+      { type: 'input', id: 'a', value: '1', when: { field: 'b', op: 'empty' } },
+      { type: 'input', id: 'b', value: '1', when: { field: 'a', op: 'empty' } },
+      { type: 'submit', label: 'Send', action: 'send' },
+    ] }
+    const view = render(<GenuiBlock spec={spec} initialState={{ fields: { a: '1', b: '1' } }} />)
+    expect(view.container.querySelector('[data-genui]')).not.toBeNull()
+    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
+  it('recognizes cycles between registered input fields and diagrams', () => {
+    const result = processGenuiSpec({ items: [
+      { type: 'diagram', id: 'selected', kind: 'flowchart', nodes: [{ id: 'node', label: 'Node' }], when: { field: 'name', op: 'not-empty' } },
+      { type: 'input', id: 'name', when: { field: 'selected', op: 'not-empty' } },
+    ] })
+    expect(result.errors.join(' ')).toContain('circular visibility dependency')
+  })
+
+  it('rejects circular field visibility dependencies', () => {
+    const result = processGenuiSpec({ items: [
+      { type: 'diagram', id: 'selection', kind: 'flowchart', nodes: [{ id: 'db', label: 'Database' }], when: { field: 'selection', op: 'empty' } },
+    ] })
+    expect(result.errors).toContain("items[0].when.field: circular visibility dependency involving 'selection'")
+    const nested = processGenuiSpec({ items: [
+      { type: 'card', when: { field: 'name', op: 'empty' }, items: [{ type: 'input', id: 'name' }] },
+    ] })
+    expect(nested.errors).toContain("items[0].when.field: circular visibility dependency involving 'name'")
   })
 
   it('requires an array for in / not-in', () => {

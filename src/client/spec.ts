@@ -17,17 +17,16 @@ import { COMPONENT_SCHEMAS, GENUI_NATIVE_TYPES, WHEN_OPS } from './genui-runtime
 export type GenuiWhenOp = typeof WHEN_OPS[number]
 
 /**
- * Show a node only while another field holds a value. The field is read from
- * the block's own state (`input/select/slider/textarea/date-picker/segmented-control` by `id`; `radio`,
- * `checkbox` and `choices` by `group`), so a decision tree needs no model round
- * trip: picking "公司" reveals the tax-id field immediately.
+ * 根据区块自身保存的字段值控制节点显示：输入类组件、地图和图解使用 `id`，
+ * `radio`、`checkbox` 和 `choices` 使用 `group`。例如选择“公司”后，
+ * 可以立即显示税号输入框。
  *
  * Hidden nodes are not rendered, and their values are excluded from the sibling
  * `submit` payload — a hidden field must never submit a stale value the reader
  * cannot see.
  */
 export interface GenuiWhen {
-  /** Field id or answer group to read. */
+  /** 要读取的字段 ID 或答案组名。 */
   field: string
   op: GenuiWhenOp
   /** Comparison target: a scalar for eq/neq/gt/…, a list for in/not-in. */
@@ -1037,6 +1036,8 @@ export interface GenuiDiagramNode {
   label: string
   /** Optional technical sublabel (Geist mono in the renderer). */
   sub?: string
+  /** 选择节点后显示的说明。 */
+  description?: string
   /** Semantic treatment; `focal` is budgeted (max 2 per diagram). */
   type?: GenuiDiagramNodeType
   /** Position / size (coordinate-mode kinds only). 4px grid is enforced at render. */
@@ -1097,6 +1098,8 @@ export interface GenuiDiagramZone {
  */
 export interface GenuiDiagram {
   type: 'diagram'
+  /** 保存所选节点 ID，供周边组件读取。 */
+  id?: string
   /** The 27-type editorial vocabulary. */
   kind: GenuiDiagramKind
   /** Surface skin; default follows the host theme. */

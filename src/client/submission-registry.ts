@@ -25,7 +25,7 @@ export interface CheckboxSubmissionMember {
 export interface FieldSubmissionMember {
   kind: 'field'
   key: string
-  fieldType: 'input' | 'textarea' | 'select' | 'slider' | 'map' | 'date-picker' | 'segmented-control'
+  fieldType: 'input' | 'textarea' | 'select' | 'slider' | 'map' | 'diagram' | 'date-picker' | 'segmented-control'
   secret: boolean
   datePicker?: { mode: 'single' | 'range'; min?: string; max?: string }
 }
@@ -98,6 +98,7 @@ export function analyzeSubmissionRegistry(spec: GenuiSpec, allowExternalGroups =
       case 'date-picker':
       case 'segmented-control':
       case 'map':
+      case 'diagram':
         if (node.id === undefined) return
         member = {
           kind: 'field', key: node.id, fieldType: node.type, secret: node.type === 'input' && node.inputType === 'password',

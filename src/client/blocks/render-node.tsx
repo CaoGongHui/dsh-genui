@@ -637,7 +637,7 @@ function renderNodeBody(
     case 'file-tree': return <FileTreeNode key={key} node={node} />
     case 'breadcrumb': return <BreadcrumbNode key={key} node={node} />
     case 'quiz': return <QuizNode key={key} node={node} onAction={onAction} />
-    case 'diagram': return <DiagramNode key={key} node={node} />
+    case 'diagram': return <DiagramNode key={key} node={node} answers={answers} />
 
     case 'echart': return <EChartNode key={key} node={node} />
     default: return <div key={key} role="alert" data-genui-error>{t('err.unknownType', { type: String((node as { type: string }).type) })}</div>
