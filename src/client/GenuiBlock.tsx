@@ -12,6 +12,7 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useGenuiAction } from './action-context.ts'
 import css from './GenuiBlock.module.css'
 import { loadBlockState, saveBlockState } from './interaction-store.ts'
+import { GENUI_LIMITS } from './genui-runtime/index.ts'
 import { recordFence, recordInteraction } from './achievement-store.ts'
 import { renderNode } from './blocks/render-node.tsx'
 import type { AnswersState, GenuiBlockProps } from './blocks/state.ts'
@@ -20,6 +21,7 @@ import type { GenuiSpec } from './spec.ts'
 import { compileSubmissionRegistry } from './submission-registry.ts'
 import { evaluateComputed, resolveComputedSpec } from './computed.ts'
 import { parseDecimalNumber } from './safe-math.ts'
+import { isDatePickerValueValid } from './date-picker.ts'
 import { walkGenuiNodes } from './walk-spec.ts'
 import { repairMap } from './map-data.ts'
 
@@ -104,17 +106,29 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
     const numeric = new Set<string>()
     const secret = new Set<string>()
     const declared = new Set<string>()
-    const mapOptions = new Map<string, Set<string>>()
+    const fieldOptions = new Map<string, Set<string>>()
+    const segmentedDefaults = new Map<string, string>()
+    const datePickers = new Map<string, { mode: 'single' | 'range'; min?: string; max?: string }>()
     walkGenuiNodes(spec, node => {
-      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'editor') && node.id !== undefined) declared.add(node.id)
+      if ((node.type === 'input' || node.type === 'textarea' || node.type === 'editor' || node.type === 'select' || node.type === 'slider' || node.type === 'map' || node.type === 'date-picker' || node.type === 'segmented-control' || node.type === 'diagram') && node.id !== undefined) declared.add(node.id)
+      if (node.type === 'date-picker' && node.id !== undefined) {
+        datePickers.set(node.id, { mode: node.mode ?? 'single', ...(node.min === undefined ? {} : { min: node.min }), ...(node.max === undefined ? {} : { max: node.max }) })
+      }
       if (node.type === 'map' && node.id !== undefined) {
-        mapOptions.set(node.id, new Set(repairMap(node)?.locations.map(location => location.id)))
+        fieldOptions.set(node.id, new Set(repairMap(node)?.locations.map(location => location.id)))
+      }
+      if (node.type === 'segmented-control' && node.id !== undefined) {
+        fieldOptions.set(node.id, new Set(node.options))
+        if (node.value !== undefined && node.options.includes(node.value)) segmentedDefaults.set(node.id, node.value)
+      }
+      if (node.type === 'diagram' && node.id !== undefined) {
+        fieldOptions.set(node.id, new Set(node.nodes.slice(0, GENUI_LIMITS.maxDiagramNodes).map(item => item.id)))
       }
       if (node.type !== 'input' || node.id === undefined) return
       if (node.inputType === 'number') numeric.add(node.id)
       if (node.inputType === 'password') secret.add(node.id)
     })
-    return { numeric, secret, declared, mapOptions }
+    return { numeric, secret, declared, fieldOptions, datePickers, segmentedDefaults }
   }, [spec])
   const secretFields = fieldKinds.secret
   // 输入草稿始终归属于字段；计算使用最近的有效数字，提交与保存使用草稿值。
@@ -126,12 +140,20 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   })
   const fields = useMemo(() => Object.fromEntries(Object.entries(fieldState.fields)
     .filter(([id]) => fieldKinds.declared.has(id) && !secretFields.has(id))
-    .map(([id, value]) => [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? '' : value])), [fieldState.fields, fieldKinds, secretFields])
+    .map(([id, value]) => {
+      const datePicker = fieldKinds.datePickers.get(id)
+      if (datePicker !== undefined && value !== '' && !isDatePickerValueValid(value, datePicker.mode, datePicker.min, datePicker.max)) return [id, '']
+      return [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? (fieldKinds.segmentedDefaults.get(id) ?? '') : value]
+    })), [fieldState.fields, fieldKinds, secretFields])
   // 替换内容可能沿用表单标识并移除字段；已移除字段不能进入草稿、导出或后续提交。
   useEffect(() => {
     setFieldState(prev => {
       const entries = Object.entries(prev.fields).filter(([id]) => fieldKinds.declared.has(id) && !secretFields.has(id))
-        .map(([id, value]): [string, string] => [id, fieldKinds.mapOptions.get(id)?.has(value) === false ? '' : value])
+        .map(([id, value]): [string, string] => {
+          const datePicker = fieldKinds.datePickers.get(id)
+          if (datePicker !== undefined && value !== '' && !isDatePickerValueValid(value, datePicker.mode, datePicker.min, datePicker.max)) return [id, '']
+          return [id, fieldKinds.fieldOptions.get(id)?.has(value) === false ? (fieldKinds.segmentedDefaults.get(id) ?? '') : value]
+        })
       if (entries.length === Object.keys(prev.fields).length && entries.every(([id, value]) => prev.fields[id] === value)) return prev
       return { fields: Object.fromEntries(entries), numericValues: Object.fromEntries(Object.entries(prev.numericValues)
         .filter(([id]) => fieldKinds.numeric.has(id) && !secretFields.has(id))) }
@@ -215,7 +237,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   }, [])
   const answersState = useMemo<AnswersState>(
     () => ({
-      answers, multiAnswers, fields, secretFields, invalidNumericFields, hidden: hiddenKeys, registry: submissionRegistry, locked, round,
+      answers, multiAnswers, fields, secretFields, invalidNumericFields, hidden: hiddenKeys, conditionHidden: hiddenKeys, registry: submissionRegistry, locked, round,
       setAnswer, setMultiAnswer, setField, clear, setLocked,
     }),
     [answers, multiAnswers, fields, secretFields, invalidNumericFields, hiddenKeys, submissionRegistry, locked, round, setAnswer, setMultiAnswer, setField, clear],

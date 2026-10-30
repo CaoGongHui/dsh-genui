@@ -192,6 +192,11 @@ jobs:
       - name: Check optional table wrapping in real browser
         run: node scripts/check-table-wrap-browser.mjs
 
+      - name: Check semantic block contrast in real browser
+        run: node scripts/check-blocks-theme-browser.mjs
+        env:
+          BROWSER_BIN: google-chrome
+
       - name: Archive newline browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -200,6 +205,7 @@ jobs:
           path: |
             .e2e-artifacts/text-newlines/
             .e2e-artifacts/table-wrap/
+            .e2e-artifacts/blocks-theme/
           if-no-files-found: ignore
 
   windows-pack:

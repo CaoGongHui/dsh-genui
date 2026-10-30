@@ -56,6 +56,8 @@ export interface AnswersState {
   /** Field ids / answer groups currently hidden by a `when` condition. Their
    * values never enter a submit payload and never make a submit look unanswered. */
   hidden: ReadonlySet<string>
+  /** 隐藏字段和答案组不会作为其他 `when` 条件的输入。 */
+  conditionHidden?: ReadonlySet<string>
   registry: SubmissionRegistry
   /** True after a local grading: questions are locked until 重新作答. */
   locked: boolean

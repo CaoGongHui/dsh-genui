@@ -68,6 +68,7 @@ export const TEXT_ALIGNS = ['left', 'center', 'right'] as const
 export const BUTTON_TONES = ['primary', 'danger', 'success', 'ghost'] as const
 export const BADGE_TONES = ['success', 'warn', 'danger', 'accent'] as const
 export const INPUT_TYPES = ['text', 'email', 'password', 'color', 'number'] as const
+export const DATE_PICKER_MODES = ['single', 'range'] as const
 export const CALLOUT_TONES = ['info', 'success', 'warning', 'error'] as const
 export const CHART_KINDS = ['bars', 'line', 'donut'] as const
 export const PLOT_KINDS = ['line', 'area', 'scatter'] as const
@@ -264,6 +265,7 @@ const diagramNodeSchema = recordSchema(['id', 'label'], {
   id: 'string',
   label: 'string',
   sub: 'string',
+  description: 'string',
   type: 'string',
   x: 'number',
   y: 'number',
@@ -400,7 +402,7 @@ const RAW_COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   code: schema(['code'], { ...nodeFields, lang: 'string', code: 'string' }, { content: 'code', text: 'code' }),
   col: schema(['items'], { ...nodeFields, items: 'nodes', gap: 'number', width: 'number' }),
   copy: schema(['text'], { ...nodeFields, label: 'string', text: 'string', expandable: 'boolean', previewLines: 'number' }, { content: 'text', code: 'text', value: 'text' }),
-  diagram: schema(['kind', 'nodes'], { ...nodeFields, kind: 'string', variant: 'string', title: 'string', nodes: 'array', edges: 'array', zones: 'array', theme: 'object' }, {}, {
+  diagram: schema(['kind', 'nodes'], { ...nodeFields, id: 'string', kind: 'string', variant: 'string', title: 'string', nodes: 'array', edges: 'array', zones: 'array', theme: 'object' }, {}, {
     nested: { nodes: diagramNodeSchema, edges: diagramEdgeSchema, zones: diagramZoneSchema, theme: diagramThemeSchema },
     enums: { kind: DIAGRAM_KINDS, variant: DIAGRAM_VARIANTS },
   }),
@@ -426,6 +428,7 @@ const RAW_COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   icon: schema(['name'], { ...nodeFields, name: 'string', label: 'string', tone: 'string', size: 'number', tile: 'boolean' }, { icon: 'name' }, { enums: { tone: ICON_TONES } }),
   image: schema(['src'], { ...nodeFields, src: 'string', alt: 'string', caption: 'string' }, { url: 'src', link: 'src' }),
   input: schema([], { ...nodeFields, label: 'string', placeholder: 'string', value: 'string', inputType: 'string', action: 'string', id: 'string' }, {}, { enums: { inputType: INPUT_TYPES } }),
+  'date-picker': schema([], { ...nodeFields, label: 'string', mode: 'string', value: 'string', min: 'string', max: 'string', id: 'string' }, {}, { enums: { mode: DATE_PICKER_MODES } }),
   json: schema(['value'], { ...nodeFields, value: 'unknown' }),
   keyvalue: schema(['pairs'], { ...nodeFields, pairs: 'array' }, { items: 'pairs', rows: 'pairs', entries: 'pairs' }, { nested: { pairs: keyValueRecordSchema } }),
   link: schema(['label'], { ...nodeFields, label: 'string', href: 'string' }),
@@ -443,6 +446,7 @@ const RAW_COMPONENT_SCHEMAS: Readonly<Record<string, ComponentSchema>> = {
   row: schema(['items'], { ...nodeFields, items: 'nodes', wrap: 'boolean', spacer: 'boolean', justify: 'string' }, {}, { enums: { justify: ROW_JUSTIFY } }),
   scene3d: schema(['meshes'], { ...nodeFields, title: 'string', meshes: 'array', ambient: 'number', background: 'string' }, {}, { nested: { meshes: sceneMeshSchema } }),
   select: schema(['options'], { ...nodeFields, label: 'string', options: 'array', action: 'string', selected: 'number', id: 'string' }, { items: 'options' }),
+  'segmented-control': schema(['options'], { ...nodeFields, label: 'string', options: 'array', value: 'string', id: 'string', action: 'string' }),
   slider: schema([], { ...nodeFields, label: 'string', min: 'number', max: 'number', step: 'number', value: 'number', action: 'string', id: 'string' }),
   spacer: schema([], nodeFields),
   hero: schema(['title'], {

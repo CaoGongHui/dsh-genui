@@ -48,6 +48,7 @@ describe('submission registry', () => {
       { type: 'textarea', id: 'note' },
       { type: 'select', id: 'choice', options: ['A'] },
       { type: 'slider', id: 'amount' },
+      { type: 'diagram', id: 'architecture', kind: 'architecture', nodes: [{ id: 'api', label: 'API' }] },
     ] } as GenuiSpec
     const { registry, diagnostics } = analyzeSubmissionRegistry(spec)
     expect(diagnostics).toEqual([])
@@ -58,6 +59,7 @@ describe('submission registry', () => {
       { kind: 'field', key: 'note', fieldType: 'textarea', secret: false },
       { kind: 'field', key: 'choice', fieldType: 'select', secret: false },
       { kind: 'field', key: 'amount', fieldType: 'slider', secret: false },
+      { kind: 'field', key: 'architecture', fieldType: 'diagram', secret: false },
     ])
   })
 
@@ -66,6 +68,8 @@ describe('submission registry', () => {
       { items: [{ type: 'submit', label: 'Send', groups: ['missing'] }], fragment: "items[0].groups[0]: submit.groups references unknown submission member 'missing'" },
       { items: [{ type: 'input', id: 'name' }, { type: 'submit', label: 'Send', groups: ['name', 'name'] }], fragment: "items[1].groups[1]: duplicate submission member 'name'" },
       { items: [{ type: 'input', id: 'name' }, { type: 'textarea', id: 'name' }], fragment: "items[1].id conflicts with items[0].id" },
+      { items: [{ type: 'diagram', id: 'selection', kind: 'architecture', nodes: [{ id: 'a', label: 'A' }] }, { type: 'input', id: 'selection' }], fragment: "items[1].id conflicts with items[0].id" },
+      { items: [{ type: 'diagram', id: 'selection', kind: 'architecture', nodes: [{ id: 'a', label: 'A' }] }, { type: 'diagram', id: 'selection', kind: 'architecture', nodes: [{ id: 'b', label: 'B' }] }], fragment: "items[1].id conflicts with items[0].id" },
       { items: [{ type: 'radio', group: 'q', options: ['A'] }, { type: 'radio', group: 'q', options: ['B'] }], fragment: "items[1].group conflicts with items[0].group" },
       { items: [{ type: 'radio', group: 'q', options: ['A'] }, { type: 'checkbox', group: 'q', label: 'B' }], fragment: "items[1].group conflicts with items[0].group" },
       { items: [{ type: 'radio', group: 'q', options: ['A'] }, { type: 'input', id: 'q' }], fragment: "items[1].id conflicts with items[0].group" },

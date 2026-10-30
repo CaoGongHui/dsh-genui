@@ -37,6 +37,8 @@ import { BlocksNode } from './blocks.tsx'
 import { EditorNode } from './editor.tsx'
 import { EntityCardNode } from './entity-card.tsx'
 import { PopoverNode } from './popover.tsx'
+import { DatePickerNode } from './date-picker.tsx'
+import { SegmentedControlNode } from './segmented-control.tsx'
 
 import { EChartNode } from '../EChartNode.tsx'
 
@@ -400,6 +402,8 @@ function renderNodeBody(
     }
     case 'input': return <InputNode key={JSON.stringify([path, node.id, node.inputType ?? 'text'])} node={node} onAction={onAction} answers={answers} />
     case 'select': return <SelectNode key={JSON.stringify([path, node.id])} node={node} onAction={onAction} answers={answers} />
+    case 'date-picker': return <DatePickerNode key={JSON.stringify([path, node.id, node.mode ?? 'single'])} node={node} answers={answers} />
+    case 'segmented-control': return <SegmentedControlNode key={JSON.stringify([path, node.id])} node={node} onAction={onAction} answers={answers} />
     case 'checkbox': return <CheckboxNode key={key} node={node} onAction={onAction} answers={answers} />
     case 'link': {
       const target = classifyLinkTarget(node.href)
@@ -639,7 +643,7 @@ function renderNodeBody(
     case 'file-tree': return <FileTreeNode key={key} node={node} />
     case 'breadcrumb': return <BreadcrumbNode key={key} node={node} />
     case 'quiz': return <QuizNode key={key} node={node} onAction={onAction} />
-    case 'diagram': return <DiagramNode key={key} node={node} />
+    case 'diagram': return <DiagramNode key={key} node={node} answers={answers} />
 
     case 'echart': return <EChartNode key={key} node={node} />
     default: return <div key={key} role="alert" data-genui-error>{t('err.unknownType', { type: String((node as { type: string }).type) })}</div>

@@ -33,6 +33,13 @@ body[data-ds-dark-theme] .panel {
      weight was tuned separately. */
   --dsl-g-tint: 18%;
   --dsl-g-tint-quiet: 12%;
+  /* Dense semantic figures need more separation than a quiet surface wash.
+     Keep this local to blocks: tint-strong also controls focus/data accents.
+     Retain transparent compositing so a nested card or a skin remains the
+     backdrop, rather than pinning every figure to a host background layer. */
+  --dsl-g-blocks-tint: 28%;
+  --dsl-g-blocks-fill: 28%;
+  --dsl-g-blocks-border: 50%;
 }
 
 .block,
@@ -104,6 +111,9 @@ body[data-ds-dark-theme] .panel {
   --dsl-g-tint: 12%;
   --dsl-g-tint-quiet: 8%;
   --dsl-g-tint-strong: 14%;
+  --dsl-g-blocks-tint: var(--dsl-g-tint);
+  --dsl-g-blocks-fill: var(--dsl-g-tint-strong);
+  --dsl-g-blocks-border: 30%;
   --dsl-g-font-mono: var(--ds-font-family-code, ui-monospace, 'SF Mono', monospace);
   /* Elevation is theme-specific, because the two themes lift a card off the
      page by OPPOSITE means:
@@ -1923,6 +1933,23 @@ img.mediaPlayer { aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsl
 .mermaidErr { color: var(--dsw-alias-state-error-primary, #ff6b6b); font-size: var(--dsl-g-font-meta); }
 .mermaidHint { color: var(--dsw-alias-label-tertiary); font-size: var(--dsl-g-font-meta); }
 
+/* ---------- 交互图解 ---------- */
+
+.diagramNode { cursor: pointer; outline: none; }
+.diagramNode:focus-visible { filter: drop-shadow(0 0 2px var(--dsl-g-accent)); }
+.diagramDetails {
+  display: grid;
+  gap: var(--dsl-g-gap-xs);
+  margin-top: var(--dsl-g-gap-sm);
+  padding: var(--dsl-g-gap-sm) var(--dsl-g-gap-md);
+  border: 1px solid var(--dsl-g-border);
+  border-radius: var(--dsl-g-radius-control);
+  background: var(--dsl-g-surface);
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsl-g-font-body);
+}
+.diagramDetailsHeading { color: var(--dsw-alias-label-tertiary); font-size: var(--dsl-g-font-meta); }
+
 /* ---------- scene3d ---------- */
 
 .scene3dWrap { display: flex; flex-direction: column; gap: var(--dsl-g-gap-sm); }
@@ -2776,7 +2803,7 @@ button.ftNameBtn[aria-expanded] { cursor: pointer; }
   border-radius: 6px;
   /* Default fill is the accent wash: a block without an explicit colour must
      still read as a block, never as invisible text. */
-  background: color-mix(in srgb, var(--dsl-g-accent) var(--dsl-g-tint-strong), transparent);
+  background: color-mix(in srgb, var(--dsl-g-accent) var(--dsl-g-blocks-fill), transparent);
   color: var(--dsw-alias-label-primary);
   font-size: var(--dsl-g-font-meta);
   font-weight: 650;
@@ -2821,9 +2848,9 @@ button.ftNameBtn[aria-expanded] { cursor: pointer; }
   font-weight: 600;
 }
 .blocksCell[data-tone] {
-  background: color-mix(in srgb, var(--dsl-g-tone, var(--dsl-g-accent)) var(--dsl-g-tint), transparent);
+  background: color-mix(in srgb, var(--dsl-g-tone, var(--dsl-g-accent)) var(--dsl-g-blocks-tint), transparent);
   color: var(--dsw-alias-label-primary);
-  border: 1px solid color-mix(in srgb, var(--dsl-g-tone, var(--dsl-g-accent)) 30%, transparent);
+  border: 1px solid color-mix(in srgb, var(--dsl-g-tone, var(--dsl-g-accent)) var(--dsl-g-blocks-border), transparent);
 }
 .blocksCell[data-tone="accent"] { --dsl-g-tone: var(--dsl-g-accent); }
 .blocksCell[data-tone="success"] { --dsl-g-tone: var(--dsw-alias-state-success-primary, #3ecf8e); }
@@ -2916,6 +2943,6 @@ button.ftNameBtn[aria-expanded] { cursor: pointer; }
    `transparent` and erase the highlight. */
 .blocksCell.blocksCellPlain[data-tone] {
   border: 0;
-  background: color-mix(in srgb, var(--dsl-g-tone, var(--dsl-g-accent)) var(--dsl-g-tint), transparent);
+  background: color-mix(in srgb, var(--dsl-g-tone, var(--dsl-g-accent)) var(--dsl-g-blocks-tint), transparent);
   border-radius: 10px;
 }
