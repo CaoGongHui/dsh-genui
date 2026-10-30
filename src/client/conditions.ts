@@ -30,10 +30,12 @@ export interface ConditionState {
   fields: Readonly<Record<string, string>>
   answers: Readonly<Record<string, string>>
   multiAnswers: Readonly<Record<string, string[]>>
+  conditionHidden?: ReadonlySet<string>
 }
 
 /** Current value of a referenced field, or undefined when nothing set it. */
 function readValue(field: string, state: ConditionState): string | readonly string[] | undefined {
+  if (state.conditionHidden?.has(field)) return undefined
   const inFields = state.fields[field]
   if (inFields !== undefined) return inFields
   const multi = state.multiAnswers[field]
@@ -126,8 +128,7 @@ interface ConditionNode {
  * @returns keys whose visible controls are not on screen right now.
  */
 export function collectHiddenKeys(items: unknown, state: ConditionState): ReadonlySet<string> {
-  const hidden = new Set<string>()
-  if (!Array.isArray(items)) return hidden
+  if (!Array.isArray(items)) return new Set(state.conditionHidden ?? [])
 
   const ownKey = (node: ConditionNode): string | undefined => {
     const id = typeof node.id === 'string' ? node.id : undefined
@@ -135,23 +136,39 @@ export function collectHiddenKeys(items: unknown, state: ConditionState): Readon
     return typeof node.group === 'string' ? node.group : undefined
   }
 
-  const walk = (value: unknown): void => {
-    if (Array.isArray(value)) { value.forEach(walk); return }
-    if (typeof value !== 'object' || value === null) return
-    const node = value as ConditionNode
-    const when = node.when as GenuiWhen | undefined
-    const visible = when === undefined || evaluateWhen(when, state)
-    if (!visible) {
-      const key = ownKey(node)
-      if (key !== undefined) hidden.add(key)
+  const collectPass = (conditionHidden: ReadonlySet<string>): Set<string> => {
+    const found = new Set<string>()
+    const passState = { ...state, conditionHidden }
+    const walk = (value: unknown): void => {
+      if (Array.isArray(value)) { value.forEach(walk); return }
+      if (typeof value !== 'object' || value === null) return
+      const node = value as ConditionNode
+      const when = node.when as GenuiWhen | undefined
+      const visible = when === undefined || evaluateWhen(when, passState)
+      if (!visible) {
+        const key = ownKey(node)
+        if (key !== undefined) found.add(key)
+      }
+      // Descendants of a hidden container are hidden too, and so are their keys.
+      if (!visible) collectKeys(value, found)
+      else if (node.items !== undefined) walk(node.items)
     }
-    // Descendants of a hidden container are hidden too, and so are their keys.
-    if (!visible) collectKeys(value, hidden)
-    else if (node.items !== undefined) walk(node.items)
+
+    walk(items)
+    return found
   }
 
-  walk(items)
-  return hidden
+  const seed = new Set(state.conditionHidden ?? [])
+  let hidden = new Set(seed)
+  const seen = new Set<string>()
+  while (true) {
+    const signature = JSON.stringify([...hidden].sort())
+    if (seen.has(signature)) throw new Error('GenUI when conditions do not converge to a stable visibility state')
+    seen.add(signature)
+    const next = new Set([...seed, ...collectPass(hidden)])
+    if (next.size === hidden.size && [...next].every(key => hidden.has(key))) return next
+    hidden = next
+  }
 }
 
 /** Add every id/group under a subtree (used when a container is hidden). */

@@ -387,6 +387,13 @@ export const EN = {
   'block.choices.count': '{count} selected',
   'block.choices.localOnly': 'Kept locally · nothing was sent',
   'block.choices.sent': 'Sent · you can still change it',
+  'block.datePicker.start': 'Start date',
+  'block.datePicker.end': 'End date',
+  'block.datePicker.date': 'Date',
+  'block.datePicker.range': 'Date range',
+  'block.datePicker.invalidRange': 'End date must be on or after the start date.',
+  'block.datePicker.invalidDate': 'Date must be within the available range.',
+  'block.segmentedControl': 'Choose an option',
 
   // -------------------------------------------------------- error text
   'err.boundary.generic': 'this interface',

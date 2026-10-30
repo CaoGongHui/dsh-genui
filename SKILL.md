@@ -99,6 +99,8 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 - **秘密禁令**：不得索取或生成密码、API Key、访问令牌、恢复码等秘密输入；遇到此类需求直接拒绝并解释
 - input: `{"type":"input","label":"...","placeholder":"...","inputType":"text|email|color|number","value":"...","action":"name"?,"id":"field-id"?}` — `color` 使用浏览器原生取色器，值使用 `#RRGGBB`；`number` 可作为 Computed 数值输入；action 在失焦**和回车**时触发（回车带 `submit:true`）；**blur 仅值有变化才发送**（聚焦又离开不产生空往返）；payload 带 `id` 帮模型定位字段；带 `id` 的值刷新后保留、并被 submit 收集进 `fields`
 - select: `{"type":"select","label":"...","options":["...","..."],"selected":下标?,"action":"pick"?,"id":"field-id"?}` — `selected` 预选某选项（缺省显示「请选择…」占位，不静默预选第一项）；带 `id` 的选择跨刷新保留并进 submit 的 `fields`
+- date-picker: `{"type":"date-picker","label":"...","mode":"single|range","value":"YYYY-MM-DD 或 YYYY-MM-DD/YYYY-MM-DD","min":"YYYY-MM-DD","max":"YYYY-MM-DD","id":"field-id"}` — 使用浏览器原生日期控件；日期必须是真实日历日期，范围模式的值是开始和结束日期组成的 ISO 区间；范围输入完整且有效后，带 `id` 的值进入共享状态与 submit 的 `fields`
+- segmented-control: `{"type":"segmented-control","label":"...","options":["...","..."],"value":"...","id":"field-id","action":"pick"}` — 胶囊式单选控件；带 `id` 时选中值进入共享状态，可用于 `when` 更新同级组件，也会进入 submit 的 `fields`；`action` 可选，设置后每次选择都会发送该 action
 - checkbox: `{"type":"checkbox","label":"<user-language option>","checked":true?,"action":"toggle"?,"group":"group-id"?}` — 默认保持逐次 `action` 行为；**加 `group` 进入多选聚合模式**：同组 checkbox 可反复勾选/取消，变化只在本地记录、不发逐次 action，兄弟 `submit` 一次性把该组已选 label 作为字符串数组放进 `answers`（例如 `{"styles":["<user-language option>","<user-language option>"]}`）
 - slider: `{"type":"slider","label":"...","min":0,"max":100,"step":1,"value":n?,"action":"name"?,"id":"field-id"?}` — 数值表单滑块：实时显示数值；带 `id` 跨刷新保留并进 submit 的 `fields`（拖拽经防抖合并成一次 action）
 - radio（**legacy，仅用于兼容老围栏**：试卷与决策都改用 `choices`。`choices` 的 `group` + `answer` + `explanation` + 兄弟 `submit` 已覆盖本地判分，且每个选项还能带代价与证据。新回答不要再用 radio）: `{"type":"radio","label":"<user-language label>","options":["<user-language option>","<user-language option>"],"selected":n?,"action":"pick"?}` — 单选；**加 `"group":"group-id"` 进入聚合模式**：选择只本地记录、不发往返；可设置 `"answer":正确下标或标签` 和 `"explanation":"<user-language explanation>"`，在纯 radio 且没有其他待发送表单状态时本地判卷
@@ -114,6 +116,10 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 - textarea: `{"type":"textarea","label":"...","placeholder":"...","rows":n?,"value":"...","action":"save"?,"id":"field-id"?}` — action 在失焦和 **Ctrl/Cmd+Enter** 时触发；blur 仅值有变化才发送；带 `id` 的值刷新后保留
 - tabs: `{"type":"tabs","tabs":[{"label":"...","items":[...]}]}` — 空 tab 可以省略 `items`，会按空数组处理
 - accordion: `{"type":"accordion","items":[{"title":"...","items":[...]}]}`
+
+```json dsh-ui
+{"items":[{"type":"date-picker","label":"Travel dates","mode":"range","value":"2026-10-12/2026-10-18","min":"2026-10-01","max":"2026-10-31","id":"travel_dates"},{"type":"segmented-control","label":"View","options":["Agenda","Map"],"value":"Agenda","id":"view"},{"type":"text","content":"Map view selected","when":{"field":"view","op":"eq","value":"Map"}}]}
+```
 - copy: `{"type":"copy","label":"<user-language action>","text":"<user-language text>","expandable":true?,"previewLines":n?}` · [docs/copy-preview.md](docs/copy-preview.md)
 
 **状态持久化（v2.7）**：radio 答案、checkbox 分组选择、交卷锁定、输入值按「会话 + 内容指纹」自动保存——用户刷新页面/重开会话，同一块 UI 的状态原样恢复；你重渲染**相同内容**会保留用户状态，渲染**新内容**（换题等）自动从头开始。

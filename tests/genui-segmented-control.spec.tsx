@@ -1,0 +1,89 @@
+// @vitest-environment jsdom
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
+import { GenuiActionContext } from '../src/client/action-context.ts'
+import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
+import { validateGenuiSpec } from '../src/client/guard.ts'
+import type { GenuiSpec } from '../src/client/spec.ts'
+
+afterEach(() => { cleanup(); localStorage.clear() })
+
+describe('segmented-control component', () => {
+  it('validates unique options and a selected value from the option list', () => {
+    expect(validateGenuiSpec({ items: [{
+      type: 'segmented-control', options: ['Agenda', 'Map'], value: 'Agenda', id: 'view',
+    }] }).ok).toBe(true)
+    expect(validateGenuiSpec({ items: [{ type: 'segmented-control', options: [] }] }).ok).toBe(false)
+    expect(validateGenuiSpec({ items: [{ type: 'segmented-control', options: ['A', 'A'] }] }).ok).toBe(false)
+    expect(validateGenuiSpec({ items: [{ type: 'segmented-control', options: ['A'], value: 'B' }] }).ok).toBe(false)
+  })
+
+  it('updates sibling visibility and submits the selected shared value', async () => {
+    const actions: Array<[string, Record<string, unknown>]> = []
+    const spec: GenuiSpec = { items: [
+      { type: 'segmented-control', label: 'View', options: ['Agenda', 'Map'], value: 'Agenda', id: 'view' },
+      { type: 'text', content: 'Map details', when: { field: 'view', op: 'eq', value: 'Map' } },
+      { type: 'submit', label: 'Send', action: 'send_view', groups: ['view'] },
+    ] }
+    render(<GenuiActionContext.Provider value={(action, payload) => actions.push([action, payload])}>
+      <GenuiBlock spec={spec} />
+    </GenuiActionContext.Provider>)
+
+    expect(screen.queryByText('Map details')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: 'Map' }))
+    expect(await screen.findByText('Map details')).toBeTruthy()
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(actions[0]?.[1].fields).toEqual({ view: 'Map' })
+  })
+
+  it('emits the optional action on each local selection', () => {
+    const actions: Array<[string, Record<string, unknown>]> = []
+    const spec: GenuiSpec = { items: [
+      { type: 'segmented-control', options: ['Week', 'Month'], id: 'period', action: 'change_period' },
+    ] }
+    render(<GenuiActionContext.Provider value={(action, payload) => actions.push([action, payload])}>
+      <GenuiBlock spec={spec} />
+    </GenuiActionContext.Provider>)
+
+    fireEvent.click(screen.getByRole('radio', { name: 'Month' }))
+    expect(actions).toEqual([['change_period', { type: 'segmented-control', value: 'Month', id: 'period' }]])
+  })
+
+  it('does not expose a restored selection while its control is hidden', () => {
+    const spec: GenuiSpec = { items: [
+      { type: 'segmented-control', label: 'Visibility', options: ['Show', 'Hide'], value: 'Hide', id: 'visibility' },
+      { type: 'segmented-control', label: 'View', options: ['Agenda', 'Map'], value: 'Map', id: 'view', when: { field: 'visibility', op: 'eq', value: 'Show' } },
+      { type: 'text', content: 'Map details', when: { field: 'view', op: 'eq', value: 'Map' } },
+    ] }
+    render(<GenuiBlock spec={spec} stateKey="hidden-segmented-restore" initialState={{ fields: {
+      visibility: 'Hide', view: 'Map',
+    } }} />)
+
+    expect(screen.queryByLabelText('View')).toBeNull()
+    expect(screen.queryByText('Map details')).toBeNull()
+    fireEvent.click(screen.getByRole('radio', { name: 'Show' }))
+    expect(screen.getByLabelText('View')).toBeTruthy()
+    expect(screen.getByText('Map details')).toBeTruthy()
+  })
+
+  it('submits a restored value when a hidden dependency makes its condition empty', () => {
+    const actions: Array<[string, Record<string, unknown>]> = []
+    const spec: GenuiSpec = { items: [
+      { type: 'segmented-control', options: ['Show', 'Hide'], value: 'Show', id: 'visibility' },
+      { type: 'segmented-control', options: ['Agenda', 'Map'], value: 'Map', id: 'view', when: { field: 'visibility', op: 'eq', value: 'Hide' } },
+      { type: 'segmented-control', label: 'Mode', options: ['On', 'Off'], value: 'On', id: 'mode', when: { field: 'view', op: 'empty' } },
+      { type: 'submit', label: 'Send', action: 'send_mode', groups: ['mode'] },
+    ] }
+    render(<GenuiActionContext.Provider value={(action, payload) => actions.push([action, payload])}>
+      <GenuiBlock spec={spec} stateKey="hidden-dependency-empty" initialState={{ fields: {
+        visibility: 'Show', view: 'Map', mode: 'On',
+      } }} />
+    </GenuiActionContext.Provider>)
+
+    expect(screen.getByLabelText('Mode')).toBeTruthy()
+    const submit = screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement
+    expect(submit.disabled).toBe(false)
+    fireEvent.click(submit)
+    expect(actions[0]?.[1].fields).toEqual({ visibility: 'Show', mode: 'On' })
+  })
+})

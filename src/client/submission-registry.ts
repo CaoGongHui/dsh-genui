@@ -1,5 +1,6 @@
 import { GENUI_LIMITS } from './genui-runtime/index.ts'
 import type { GenuiSpec } from './spec.ts'
+import { isDatePickerValueValid } from './date-picker.ts'
 import { GENUI_CHECKBOX_VALUE } from './spec.ts'
 import { walkGenuiNodes } from './walk-spec.ts'
 
@@ -24,8 +25,9 @@ export interface CheckboxSubmissionMember {
 export interface FieldSubmissionMember {
   kind: 'field'
   key: string
-  fieldType: 'input' | 'textarea' | 'select' | 'slider' | 'map'
+  fieldType: 'input' | 'textarea' | 'select' | 'slider' | 'map' | 'date-picker' | 'segmented-control'
   secret: boolean
+  datePicker?: { mode: 'single' | 'range'; min?: string; max?: string }
 }
 
 export interface SubmissionRegistry {
@@ -93,9 +95,14 @@ export function analyzeSubmissionRegistry(spec: GenuiSpec, allowExternalGroups =
       case 'textarea':
       case 'select':
       case 'slider':
+      case 'date-picker':
+      case 'segmented-control':
       case 'map':
         if (node.id === undefined) return
-        member = { kind: 'field', key: node.id, fieldType: node.type, secret: node.type === 'input' && node.inputType === 'password' }
+        member = {
+          kind: 'field', key: node.id, fieldType: node.type, secret: node.type === 'input' && node.inputType === 'password',
+          ...(node.type === 'date-picker' ? { datePicker: { mode: node.mode ?? 'single', ...(node.min === undefined ? {} : { min: node.min }), ...(node.max === undefined ? {} : { max: node.max }) } } : {}),
+        }
         keyPath = `${path}.id`
         break
       default:
@@ -143,7 +150,11 @@ export function isSubmissionMemberAnswered(member: SubmissionMember, state: Subm
       if (member.secret) return false
       if (!Object.hasOwn(state.fields, member.key)) return false
       const value = state.fields[member.key]
-      return value !== undefined && value.trim() !== ''
+      if (value === undefined || value.trim() === '') return false
+      if (member.fieldType === 'date-picker') {
+        return isDatePickerValueValid(value, member.datePicker?.mode ?? 'single', member.datePicker?.min, member.datePicker?.max)
+      }
+      return true
     }
   }
 }
@@ -171,7 +182,11 @@ export function resolveSubmitState({ registry, groups, state }: {
   const scopeKeys = new Set(scope.map(member => member.key))
   const hasOutOfScopePayload = Object.keys(state.answers).some(key => !scopeKeys.has(key))
     || Object.keys(state.multiAnswers).some(key => !scopeKeys.has(key))
-    || Object.entries(state.fields).some(([key, value]) => value.trim() !== '' && !state.secretFields.has(key) && !scopeKeys.has(key))
+    || Object.entries(state.fields).some(([key, value]) => {
+      if (value.trim() === '' || state.secretFields.has(key) || scopeKeys.has(key)) return false
+      const member = registry.members.get(key)
+      return member?.kind !== 'field' || member.fieldType !== 'date-picker' || isSubmissionMemberAnswered(member, state)
+    })
   const localGradeEligible = !hasUnknownMember && scope.length > 0
     && scope.every(member => member.kind === 'radio')
     && scope.some(member => member.kind === 'radio' && member.answer !== undefined)

@@ -44,6 +44,7 @@ const SHAPE_BY_TYPE: Readonly<Record<string, SkeletonShape>> = {
   diff: 'code', json: 'code',
   image: 'media', 'image-group': 'media', video: 'media', audio: 'media', scene3d: 'media',
   input: 'keyvalue', textarea: 'keyvalue', select: 'keyvalue', slider: 'keyvalue',
+  'date-picker': 'keyvalue', 'segmented-control': 'control',
   checkbox: 'keyvalue', radio: 'keyvalue', switch: 'keyvalue', submit: 'keyvalue',
   choices: 'list', quiz: 'list', compare: 'media',
   // Small single-object components: a pill is the honest placeholder for a
