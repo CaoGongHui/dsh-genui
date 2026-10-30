@@ -166,6 +166,7 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
   const hiddenKeys = useMemo(() => {
     let hidden = new Set<string>()
     const seen = new Set<string>()
+    const conservativeHidden = new Set<string>()
     for (let pass = 0; pass <= GENUI_LIMITS.maxNodes; pass += 1) {
       const current = {
         fields: Object.fromEntries(Object.entries(fields).filter(([id]) => !hidden.has(id))),
@@ -174,12 +175,16 @@ function GenuiBlockInstance({ spec, stateKey, animateEntrance = true, initialSta
       }
       const next = collectHiddenKeys(computedSpec.items, current)
       if (next.size === hidden.size && [...next].every(id => hidden.has(id))) return next
+      for (const id of next) conservativeHidden.add(id)
       const signature = [...next].sort().join('\u0000')
-      if (seen.has(signature)) throw new Error('GenUI conditional visibility did not reach a stable state')
+      // Direct GenuiBlock callers may supply a spec that bypassed validation.
+      // A cycle must not crash the entire conversation; suppress every field
+      // involved in an unstable visibility pass instead.
+      if (seen.has(signature)) return conservativeHidden
       seen.add(signature)
       hidden = new Set(next)
     }
-    throw new Error('GenUI conditional visibility exceeded the node limit')
+    return conservativeHidden
   }, [computedSpec, fields, answers, multiAnswers])
   const visibleFields = useMemo(() => Object.fromEntries(Object.entries(fields).filter(([id]) => !hiddenKeys.has(id))), [fields, hiddenKeys])
   const visibleAnswers = useMemo(() => Object.fromEntries(Object.entries(answers).filter(([id]) => !hiddenKeys.has(id))), [answers, hiddenKeys])

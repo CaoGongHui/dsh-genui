@@ -192,6 +192,17 @@ describe('when guard', () => {
     expect(bad.errors.join(' ')).toContain('when.op')
   })
 
+  it('keeps direct GenuiBlock rendering alive for cyclic conditions', () => {
+    const spec: GenuiSpec = { items: [
+      { type: 'input', id: 'a', value: '1', when: { field: 'b', op: 'empty' } },
+      { type: 'input', id: 'b', value: '1', when: { field: 'a', op: 'empty' } },
+      { type: 'submit', label: 'Send', action: 'send' },
+    ] }
+    const view = render(<GenuiBlock spec={spec} initialState={{ fields: { a: '1', b: '1' } }} />)
+    expect(view.container.querySelector('[data-genui]')).not.toBeNull()
+    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true)
+  })
+
   it('rejects circular field visibility dependencies', () => {
     const result = processGenuiSpec({ items: [
       { type: 'diagram', id: 'selection', kind: 'flowchart', nodes: [{ id: 'db', label: 'Database' }], when: { field: 'selection', op: 'empty' } },
