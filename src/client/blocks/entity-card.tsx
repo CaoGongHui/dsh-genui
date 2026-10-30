@@ -45,7 +45,8 @@ export function EntityCardNode({ node, onAction }: { node: GenuiEntityCard; onAc
           {source}
           {node.actions?.slice(0, GENUI_LIMITS.maxEntityActions).map((item, index) => (
             <button
-              className={`${css.action} ${item.tone === 'primary' ? css.primary : ''}`}
+              className={css.action}
+              data-tone={item.tone}
               type="button"
               key={`${item.action}:${index}`}
               disabled={onAction === undefined}

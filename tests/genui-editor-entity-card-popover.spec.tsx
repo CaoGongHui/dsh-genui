@@ -143,6 +143,20 @@ describe('Editor, Entity Card, and Popover', () => {
     expect(panel.style.getPropertyValue('--dsl-g-surface')).toBe('rgb(12, 34, 56)')
   })
 
+  it('preserves every declared entity action tone', () => {
+    const tones = ['primary', 'danger', 'success', 'ghost'] as const
+    const spec: GenuiSpec = { items: [{
+      type: 'entity-card', name: 'Actions',
+      actions: tones.map(tone => ({ label: tone, action: tone, tone })),
+    }] }
+    render(<GenuiActionContext.Provider value={() => undefined}>
+      <GenuiBlock spec={spec} />
+    </GenuiActionContext.Provider>)
+    for (const tone of tones) {
+      expect(screen.getByRole('button', { name: tone }).getAttribute('data-tone')).toBe(tone)
+    }
+  })
+
   it('repairs unsafe entity links and rejects invalid popover settings', () => {
     const repaired = repairGenuiSpec({ items: [{
       type: 'entity-card', name: 'Example', image: 'javascript:alert(1)', href: 'javascript:alert(1)',
