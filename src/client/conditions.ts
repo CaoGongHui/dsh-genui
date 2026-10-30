@@ -39,11 +39,11 @@ export interface ConditionState {
 /** Current value of a referenced field, or undefined when nothing set it. */
 function readValue(field: string, state: ConditionState): string | readonly string[] | undefined {
   if (state.conditionHidden?.has(field)) return undefined
-  const inFields = state.fields[field]
+  const inFields = Object.hasOwn(state.fields, field) ? state.fields[field] : undefined
   if (inFields !== undefined) return inFields
-  const multi = state.multiAnswers[field]
+  const multi = Object.hasOwn(state.multiAnswers, field) ? state.multiAnswers[field] : undefined
   if (multi !== undefined) return multi
-  return state.answers[field]
+  return Object.hasOwn(state.answers, field) ? state.answers[field] : undefined
 }
 
 function asNumbers(left: unknown, right: unknown): [number, number] | undefined {
