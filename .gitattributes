@@ -1,0 +1,4 @@
+# The plugin parses SKILL.md frontmatter with a strict LF check
+# (`raw.startsWith('---\n')`), so a CRLF checkout on Windows makes the bundled
+# skill fail to load. Pin this file to LF regardless of core.autocrlf.
+SKILL.md text eol=lf

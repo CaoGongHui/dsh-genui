@@ -131,9 +131,11 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 | 你要呈现的内容 | 用这些组件 |
 |---|---|
 | 并列结论 / 要点罗列（≥2 条） | `list`、`keyvalue` |
+| 2–6 个数字并排 | `grid` + `stat`（**不要**为此铺一张表） |
 | 单条重点强调 / 警告 / 注意事项 | `callout`（info/success/warning/error）、`badge`、`stat` |
 | 多项风险 / 注意事项 | `list`；需要统一风险底色时用 `card.tone` + `list` |
-| 数据对比 / 趋势 / 占比 | `chart`（bars/line/donut）、`echart`（ECharts 全功能）、`table` |
+| 趋势 / 占比 / 排名 | `chart`、`echart`（先看图；8 点以内用 chart） |
+| 多行明细 / 要排序筛选或逐行展开 | `table`（≥3 行、≥3 列才值得用；2 行对比用 `keyvalue`） |
 | 关键指标数字 / 进度状态 | `stat`、`progress`、`badge` |
 | 回答的视觉锚点（第一个组件） | `hero`（封面块，一条回答最多一个） |
 | 想排版不呆板 | `grid` + 子节点 `span`（bento：宽窄混排） |
@@ -141,7 +143,7 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 | 流程 / 步骤 / 阶段 / 时间线 | `steps`、`timeline`、`mermaid`（flowchart/sequence/gantt） |
 | 架构 / 系统拓扑 / 数据流 / 品牌图 | `diagram`（编辑级，27 种类型；自动布局需求才用 `mermaid`） |
 | 目录 / 文件结构 / 层级关系 | `file-tree`、`mermaid`、`accordion` |
-| 状态一览 / 检查结果 | `badge` + `table` + `progress` 组合 |
+| 状态一览 / 检查结果 | `badge` + `progress` + `stat`（table 只在要查逐项明细时） |
 | 代码 / 配置 / 改动对比 | `code`、`diff`、`json` |
 | 图片 / 截图 / 图表预览 | `image` |
 | 语音 / 音乐 / AI 视频 / 演示录像 | `audio`、`video` |
@@ -156,6 +158,14 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 ```json dsh-ui
 {"items":[{"type":"card","tone":"warning","title":"<user-language risk summary>","items":[{"type":"list","items":[{"title":"<user-language item title>","desc":"<user-language description>"},{"title":"<user-language item title>","desc":"<user-language description>"},{"title":"<user-language item title>","desc":"<user-language description>"}]}]}]}
 ```
+
+### 默认偏好：表格与提示框都不是默认件
+
+表格是**逐行明细**工具，不是默认容器。只有「≥3 行、需要逐列对照/排序/筛选/展开」时才用 `table`；2–6 个数字并排用 `grid` + `stat`，趋势/占比用 `chart`/`echart`，两个方案用两张 `card` + `keyvalue`。
+
+`callout` 是**单条风险/前提**，不是收尾装饰：结论交给 `stat`/`card`/`progress`，不要每条回答都以一个琥珀色框收尾。`steps` 同理——只有真的「按顺序做完了几步」才用，完成清单用 `list` + `badge` 更轻。
+
+**反模板约束**：同一会话里，连续两条回答不要复用同一个版式签名（`table+callout`、`steps+callout` 都算）。同一件事换一个主组件承载：状态用 `stat`+`progress`，清单用 `list`，过程用 `timeline`，结构用 `diagram`。
 
 **别用的情况**：一句话能说清的事、纯闲聊、用户明确说不要 UI、以及"为了炫技硬塞"——组件服务内容，不是内容服务组件。
 
@@ -206,12 +216,16 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 ### 不要
 
 - 装饰性编号（①②③）：该分点用 `list`，该分节用标题；
+- 把 `table` 当万能容器：两三个数字也铺一张表，或者每条回答都以表收尾；
+- 每条回答都用 `callout` 收尾，把提示框当句号；
 - 同一套骨架每条回答复用（标题栏 → 卡片网格 → 表格 → callout）；
 - 为了"显得丰富"堆组件：读者找不到重点就是失败。
 
 ### 怎么验证没模板化
 
 `node scripts/genui-usage-audit.mjs` 输出「版式多样性」：不同版式签名数、最常见签名占比、归一化熵（越接近 1 越多样）、每回答 card 数分布。熵明显下降或 card 数不降反升，就说明规则没生效。
+
+经验线（跨会话累计）：`table` 出现率 <50%、`callout` <30%、`hero`/`chart`/`echart`/`diagram` 合计 ≥15%；最常见签名占比 <20%、归一化熵 >0.8。超出就说明又开始复用同一副骨架。
 
 ## 范例：示范「判断」，不要照抄组件序列
 
@@ -220,10 +234,10 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 ### 1. 状态汇报（多点 + 有构图）
 
 ```json dsh-ui
-{"items":[{"type":"grid","cols":4,"items":[{"type":"stat","label":"<user-language metric>","value":"26","delta":"#123–#148"},{"type":"stat","label":"<user-language metric>","value":"0"},{"type":"stat","label":"<user-language metric>","value":"556","delta":"<user-language status>"},{"type":"stat","label":"<user-language metric>","value":"45"}]},{"type":"table","columns":["<user-language column>","<user-language column>","<user-language column>"],"types":["text","badge","text"],"rows":[["<user-language text>","<user-language status>","<user-language text>"],["<user-language text>","<user-language status>","<user-language text>"]]},{"type":"callout","tone":"info","title":"<user-language title>","content":"<user-language text>"}]}
+{"items":[{"type":"grid","cols":4,"items":[{"type":"stat","label":"<user-language metric>","value":"26","delta":"#123–#148"},{"type":"stat","label":"<user-language metric>","value":"0"},{"type":"stat","label":"<user-language metric>","value":"556","delta":"<user-language status>"},{"type":"stat","label":"<user-language metric>","value":"45"}]},{"type":"progress","label":"<user-language metric>","value":72,"target":80,"valueLabel":"72%"},{"type":"list","items":[{"title":"<user-language item title>","desc":"<user-language description>"},{"title":"<user-language item title>","desc":"<user-language description>"}]}]}
 ```
 
-不要这样：把同一句话既写进正文又放进卡片；也不要为每条信息配一张卡（4 个 stat 排一行就够）。
+不要这样：把同一句话既写进正文又放进卡片；也不要为每条信息配一张卡，更不要顺手再补一张表（4 个 stat 排一行就够）。
 
 ### 2. 解释/教学（文字为主，一个点睛组件）
 
@@ -236,10 +250,10 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 ### 3. 对比选型
 
 ```json dsh-ui
-{"items":[{"type":"table","columns":["<user-language column>","<user-language column>","<user-language column>"],"types":["text","text","badge"],"rows":[["<user-language text>","<user-language text>","<user-language status>"],["<user-language text>","<user-language text>","<user-language status>"]]},{"type":"callout","tone":"success","title":"<user-language title>","content":"<user-language text>"}]}
+{"items":[{"type":"grid","cols":2,"items":[{"type":"card","tone":"success","title":"<user-language option>","items":[{"type":"list","items":["<user-language text>","<user-language text>"]}]},{"type":"card","tone":"warning","title":"<user-language option>","items":[{"type":"list","items":["<user-language text>","<user-language text>"]}]}]},{"type":"keyvalue","pairs":[{"key":"<user-language key>","value":"<user-language value>"},{"key":"<user-language key>","value":"<user-language value>"}]}]}
 ```
 
-不要这样：表格里放同一批数据后又画一张图。
+不要这样：卡里和 `keyvalue` 里重复同一批数字——卡给取舍理由，`keyvalue` 给量化差异，两边分工；也不要为了"对比"先铺一张表。
 
 反例（这条会被围栏校验直接拒绝，所以别抄）：
 
@@ -366,7 +380,7 @@ Check CheckCircle Info InfoCircle Warning Error X Plus Minus Circle ArrowDown Ar
 7. **图表范围**：`plot` 给合理 xMin/xMax（如 -3.14 到 3.14）；3D 场景 mesh 少而精
 8. **规格要紧凑**：整棵组件树 ≤200 节点、≤8 层嵌套；单个 `tabs` ≤12 个标签页、`accordion` ≤24 项（超出部分会被渲染器按上限截断渲染）。避免巨型 spec
 9. **一个主题选一个主组件**：命中映射表后选**一种**组件承载，同一信息不要用两种组件重复表达（同一批数据又画 bars 又画 donut = 冗余）
-10. **数量纪律**：一条回答 3–8 个组件为宜，宁缺毋滥。反例：该用 `table` 对比时写三段 `text`；一个 `stat` 能说清的事套 `card`+`grid`；与内容无关的 `scene3d` 炫技——3D 只在内容本身就是几何/空间时才用
+10. **数量纪律**：一条回答 3–8 个组件为宜，宁缺毋滥。反例：该用 `table` 对比时写三段 `text`；一个 `stat` 能说清的事套 `card`+`grid`；与内容无关的 `scene3d` 炫技——3D 只在内容本身就是几何/空间时才用。**表格/提示框不是默认件**：数字并排先想 `grid`+`stat`，趋势先想 `chart`，结论先想 `card`/`progress`；连续两条回答不要复刻同一版式
 12. **给命令就给能直接粘的**：多行 python 一律写成 heredoc 包装的**一整段** shell 代码块（`python - <<'PY'` … `PY`），不要用 `python -c "…"` 配反斜杠续行——续行在复制/粘贴里最容易碎成多行，用户还得自己拼回 heredoc。单行表达式才用 `-c`，且必须真的在一行内写完。示例：
 
     ````text
