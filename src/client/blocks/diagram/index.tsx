@@ -9,8 +9,10 @@
  * @module @changfenhuang/dsh-genui/client/blocks/diagram
  */
 import { renderInline } from '../../inline.ts'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import css from '../../GenuiBlock.module.css'
 import type { GenuiDiagram } from '../../spec.ts'
+import type { AnswersState } from '../state.ts'
 import { GENUI_LIMITS } from '../../genui-runtime/index.ts'
 import { resolveLayout } from './layout.ts'
 import { routeEdge, labelGeometry, type Box } from './geometry.ts'
@@ -54,6 +56,7 @@ function renderNodeBox(
   sub: string | undefined,
   type: string | undefined,
   tag: string | undefined,
+  selected: boolean,
   palette: ReturnType<typeof resolvePalette>,
 ): React.ReactNode {
   const treatment = nodeTreatment(type, palette)
@@ -73,8 +76,8 @@ function renderNodeBox(
         height={box.h}
         rx={6}
         fill={treatment.fill}
-        stroke={treatment.stroke}
-        strokeWidth={1}
+        stroke={selected ? palette.accent : treatment.stroke}
+        strokeWidth={selected ? 2.5 : 1}
         strokeDasharray={treatment.dashed === true ? '5,4' : undefined}
       />
       {tag !== undefined && (
@@ -205,9 +208,16 @@ function nextUid(): string {
   return `genui-diagram-${uidCounter}`
 }
 
-/** The `diagram` node renderer. */
-export function DiagramNode({ node }: { node: GenuiDiagram }) {
+/** 渲染可选择的图解，并通过共享字段保存所选节点。 */
+export function DiagramNode({ node, answers }: { node: GenuiDiagram; answers?: AnswersState | undefined }) {
   const uid = useMemo(nextUid, [])
+  const [localSelection, setLocalSelection] = useState<{ scope: string | undefined; id: string }>({ scope: node.id, id: '' })
+  const storedSelection = node.id === undefined ? undefined : answers?.fields[node.id]
+  const scopedSelection = localSelection.scope === node.id ? localSelection.id : ''
+  const candidate = storedSelection ?? scopedSelection
+  const selectableNodes = node.nodes.slice(0, GENUI_LIMITS.maxDiagramNodes)
+  const selected = selectableNodes.some(item => item.id === candidate) ? candidate : ''
+  const selectedNode = selectableNodes.find(item => item.id === selected)
   // CSS token references follow the surrounding theme without remounting SVG nodes.
   const palette = useMemo(() => resolvePalette(node.variant, node.theme), [node.variant, node.theme])
   const layout = useMemo(() => resolveLayout(node, buildParentMap(node.edges ?? [])), [node])
@@ -223,6 +233,38 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
   const nodes = layout.nodes.slice(0, GENUI_LIMITS.maxDiagramNodes)
   const edges = layout.edges.slice(0, GENUI_LIMITS.maxDiagramEdges)
   const zones = (node.zones ?? []).slice(0, GENUI_LIMITS.maxDiagramZones)
+
+  useEffect(() => {
+    if (node.id !== undefined && storedSelection === undefined && localSelection.scope === undefined && localSelection.id !== '') {
+      answers?.setField(node.id, localSelection.id)
+      setLocalSelection({ scope: node.id, id: localSelection.id })
+      return
+    }
+    if (localSelection.scope !== node.id && localSelection.id !== '') {
+      setLocalSelection({ scope: node.id, id: '' })
+      return
+    }
+    if (selected === '' && scopedSelection !== '') {
+      setLocalSelection({ scope: node.id, id: '' })
+      return
+    }
+    if (candidate === selected) return
+    setLocalSelection({ scope: node.id, id: '' })
+    if (node.id !== undefined && candidate !== '') answers?.setField(node.id, '')
+  }, [answers, candidate, localSelection, node.id, selected, storedSelection])
+
+  /** 在本地保存节点选择，并通过稳定 ID 更新周边组件。 */
+  function selectNode(id: string): void {
+    setLocalSelection({ scope: node.id, id })
+    if (node.id !== undefined) answers?.setField(node.id, id)
+  }
+
+  /** 使用原生按钮的键盘操作激活节点。 */
+  function handleNodeKeyDown(event: KeyboardEvent<SVGGElement>, id: string): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    selectNode(id)
+  }
 
   // Focal budget: accent on 1–2 nodes max; extra focal nodes downgrade to backend.
   let focalSeen = 0
@@ -250,7 +292,7 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
         </figcaption>
       )}
       <svg
-        role="img"
+        role="group"
         aria-labelledby={titleId}
         aria-describedby={descId}
         viewBox={`0 0 ${layout.width} ${canvasH}`}
@@ -291,8 +333,18 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
             const effectiveType = l.node.type === 'focal' && focalSeen >= focalBudget ? undefined : l.node.type
             if (l.node.type === 'focal') focalSeen += 1
             return (
-              <g key={l.node.id}>
-                {renderNodeBox(l.box, l.node.label, l.node.sub, effectiveType, l.node.tag, palette)}
+              <g
+                key={l.node.id}
+                className={css.diagramNode}
+                role="button"
+                tabIndex={0}
+                aria-label={l.node.label}
+                aria-pressed={selected === l.node.id}
+                data-selected={selected === l.node.id}
+                onClick={() => selectNode(l.node.id)}
+                onKeyDown={event => handleNodeKeyDown(event, l.node.id)}
+              >
+                {renderNodeBox(l.box, l.node.label, l.node.sub, effectiveType, l.node.tag, selected === l.node.id, palette)}
               </g>
             )
           })}
@@ -302,6 +354,15 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
           {renderLegend(palette, legendItems, layout.width, legendCols)}
         </g>
       </svg>
+      {selectedNode !== undefined && (
+        <section className={css.diagramDetails} aria-live="polite">
+          <span className={css.diagramDetailsHeading}>{t('dgm.details')}</span>
+          <strong>{selectedNode.label}</strong>
+          {(selectedNode.description ?? selectedNode.sub) !== undefined && (
+            <div>{renderInline(selectedNode.description ?? selectedNode.sub ?? '')}</div>
+          )}
+        </section>
+      )}
     </figure>
   )
 }

@@ -23,7 +23,10 @@
  *
  * @module conditions
  */
-import type { GenuiWhen } from './spec.ts'
+import type { GenuiNode, GenuiWhen, GenuiSpec } from './spec.ts'
+import { GENUI_LIMITS } from './genui-runtime/index.ts'
+import { isTableDetailReachable, tableRowsForDetails } from './table-details.ts'
+import { walkGenuiNodes } from './walk-spec.ts'
 
 /** The slice of block state a condition can read. */
 export interface ConditionState {
@@ -135,35 +138,57 @@ export function collectHiddenKeys(items: unknown, state: ConditionState): Readon
     return typeof node.group === 'string' ? node.group : undefined
   }
 
-  const walk = (value: unknown): void => {
-    if (Array.isArray(value)) { value.forEach(walk); return }
-    if (typeof value !== 'object' || value === null) return
-    const node = value as ConditionNode
-    const when = node.when as GenuiWhen | undefined
-    const visible = when === undefined || evaluateWhen(when, state)
-    if (!visible) {
-      const key = ownKey(node)
-      if (key !== undefined) hidden.add(key)
-    }
-    // Descendants of a hidden container are hidden too, and so are their keys.
-    if (!visible) collectKeys(value, hidden)
-    else if (node.items !== undefined) walk(node.items)
+  const walk = (nodes: GenuiNode[], depth: number): void => {
+    if (depth > GENUI_LIMITS.maxDepth) return
+    nodes.forEach(node => {
+      const visible = node.when === undefined || evaluateWhen(node.when, state)
+      if (!visible) {
+        const key = ownKey(node)
+        if (key !== undefined) hidden.add(key)
+        // A hidden container hides every real GenUI field beneath it.
+        collectKeys(node, hidden)
+        return
+      }
+      if (depth >= GENUI_LIMITS.maxDepth) return
+      switch (node.type) {
+        case 'row':
+        case 'col':
+        case 'grid':
+        case 'card':
+          walk(node.items, depth + 1)
+          break
+        case 'carousel':
+          walk(node.items.slice(0, GENUI_LIMITS.maxCarouselItems), depth + 1)
+          break
+        case 'tabs':
+          node.tabs.forEach(tab => walk(tab.items, depth + 1))
+          break
+        case 'accordion':
+          node.items.forEach(item => walk(item.items, depth + 1))
+          break
+        case 'list':
+          node.items.forEach(item => {
+            if (item !== null && typeof item === 'object' && 'type' in item) walk([item as GenuiNode], depth + 1)
+          })
+          break
+        case 'table':
+          node.details?.slice(0, tableRowsForDetails(node).length).forEach((detail, rowIndex) => {
+            if (detail !== null && isTableDetailReachable(node, rowIndex)) walk(detail, depth + 1)
+          })
+          break
+      }
+    })
   }
 
-  walk(items)
+  walk(items as GenuiNode[], 0)
   return hidden
 }
 
 /** Add every id/group under a subtree (used when a container is hidden). */
 function collectKeys(value: unknown, into: Set<string>): void {
-  if (Array.isArray(value)) { value.forEach(entry => collectKeys(entry, into)); return }
   if (typeof value !== 'object' || value === null) return
-  const node = value as ConditionNode
-  const id = typeof node.id === 'string' ? node.id : undefined
-  if (id !== undefined) into.add(id)
-  const group = typeof node.group === 'string' ? node.group : undefined
-  if (group !== undefined) into.add(group)
-  for (const child of Object.values(node)) {
-    if (typeof child === 'object' && child !== null) collectKeys(child, into)
-  }
+  walkGenuiNodes({ items: [value as GenuiNode] } as GenuiSpec, node => {
+    if ('id' in node && node.id !== undefined) into.add(node.id)
+    if ('group' in node && node.group !== undefined) into.add(node.group)
+  })
 }

@@ -1933,6 +1933,23 @@ img.mediaPlayer { aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsl
 .mermaidErr { color: var(--dsw-alias-state-error-primary, #ff6b6b); font-size: var(--dsl-g-font-meta); }
 .mermaidHint { color: var(--dsw-alias-label-tertiary); font-size: var(--dsl-g-font-meta); }
 
+/* ---------- 交互图解 ---------- */
+
+.diagramNode { cursor: pointer; outline: none; }
+.diagramNode:focus-visible { filter: drop-shadow(0 0 2px var(--dsl-g-accent)); }
+.diagramDetails {
+  display: grid;
+  gap: var(--dsl-g-gap-xs);
+  margin-top: var(--dsl-g-gap-sm);
+  padding: var(--dsl-g-gap-sm) var(--dsl-g-gap-md);
+  border: 1px solid var(--dsl-g-border);
+  border-radius: var(--dsl-g-radius-control);
+  background: var(--dsl-g-surface);
+  color: var(--dsw-alias-label-primary);
+  font-size: var(--dsl-g-font-body);
+}
+.diagramDetailsHeading { color: var(--dsw-alias-label-tertiary); font-size: var(--dsl-g-font-meta); }
+
 /* ---------- scene3d ---------- */
 
 .scene3dWrap { display: flex; flex-direction: column; gap: var(--dsl-g-gap-sm); }
