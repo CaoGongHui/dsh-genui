@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GenuiActionContext } from '../src/client/action-context.ts'
 import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
@@ -163,5 +163,45 @@ describe('Editor, Entity Card, and Popover', () => {
     }] })
     expect(repaired?.items[0]).toEqual({ type: 'entity-card', name: 'Example' })
     expect(validateGenuiSpec({ items: [{ type: 'popover', label: 'Info', content: 'Text', trigger: 'keyboard' }] }).ok).toBe(false)
+  })
+})
+
+
+describe('editor and popover review regressions', () => {
+  it.each(['constructor', 'toString', '__proto__'])('uses the model default for an unregistered editor field %s', id => {
+    const spec: GenuiSpec = { items: [
+      { type: 'editor', id, label: 'Draft', value: 'Initial text' },
+      { type: 'submit', label: 'Send', action: 'send', groups: [id] },
+    ] }
+    expect(validateGenuiSpec(spec).ok).toBe(true)
+    const events: Record<string, unknown>[] = []
+    render(<GenuiActionContext.Provider value={(_action, payload) => { events.push(payload) }}>
+      <GenuiBlock spec={spec} />
+    </GenuiActionContext.Provider>)
+    expect((screen.getByRole('textbox', { name: 'Draft' }) as HTMLTextAreaElement).value).toBe('Initial text')
+    fireEvent.click(screen.getByRole('button', { name: 'Send' }))
+    expect(events[0]?.fields).toEqual({ [id]: 'Initial text' })
+  })
+
+  it('opens hover details without blurring an edited input or sending its action', async () => {
+    const events: string[] = []
+    render(<GenuiActionContext.Provider value={action => { events.push(action) }}>
+      <GenuiBlock spec={{ items: [
+        { type: 'input', id: 'name', label: 'Name', action: 'save_name' },
+        { type: 'popover', label: 'Hover details', content: 'Explanation', trigger: 'hover' },
+      ] }} />
+    </GenuiActionContext.Provider>)
+    const input = screen.getByRole('textbox', { name: 'Name' })
+    act(() => input.focus())
+    fireEvent.change(input, { target: { value: 'Ada' } })
+    const trigger = screen.getByRole('button', { name: 'Hover details' })
+    fireEvent.pointerEnter(trigger, { pointerType: 'mouse' })
+    fireEvent.mouseEnter(trigger)
+    fireEvent.mouseMove(trigger, { movementX: 1 })
+    await screen.findByRole('dialog', { name: 'Hover details' })
+    expect(document.activeElement).toBe(input)
+    expect(events).toEqual([])
+    fireEvent.blur(input)
+    expect(events).toEqual(['save_name'])
   })
 })

@@ -14,9 +14,10 @@ export function EditorNode({ node, answers }: { node: GenuiEditor; answers?: Ans
   const [copied, setCopied] = useState(false)
   const [edited, setEdited] = useState(false)
   const touched = useRef(false)
-  const initialDraft = useRef(answers?.fields[node.id])
+  const draft = answers !== undefined && Object.hasOwn(answers.fields, node.id)
+    ? answers.fields[node.id] : undefined
+  const initialDraft = useRef(draft)
   const registeredDefault = useRef<string | undefined>(undefined)
-  const draft = answers?.fields[node.id]
   const value = initialDraft.current === undefined ? localValue : draft ?? localValue
 
   useEffect(() => {

@@ -93,8 +93,8 @@ export function PopoverNode({ node }: { node: GenuiPopover }): ReactElement {
       </button>
       {open && (
         <FloatingPortal>
-          <FloatingFocusManager context={context} modal={false} returnFocus>
-            <div ref={setFloating} className={css.panel} style={floatingStyles} {...getFloatingProps()}>
+          <FloatingFocusManager context={context} modal={false} initialFocus={trigger === 'hover' ? -1 : 0} returnFocus>
+            <div ref={setFloating} className={css.panel} style={floatingStyles} {...getFloatingProps({ 'aria-label': node.label })}>
               <div className={css.content}>{renderInline(node.content)}</div>
               <button className={css.close} type="button" aria-label={t('block.popoverClose')} onClick={() => setOpen(false)}>×</button>
             </div>
