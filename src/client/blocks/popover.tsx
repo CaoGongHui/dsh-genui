@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react'
+import { useLayoutEffect, useState, type ReactElement } from 'react'
 import {
   FloatingFocusManager,
   FloatingPortal,
@@ -47,6 +47,30 @@ export function PopoverNode({ node }: { node: GenuiPopover }): ReactElement {
     ],
     whileElementsMounted: autoUpdate,
   })
+  // Portal 挂载在 document.body 下，需要显式同步区块专属的主题变量。
+  // 同时监听祖先主题变化，保证弹层打开期间切换主题仍能更新颜色。
+  useLayoutEffect(() => {
+    if (!open) return
+    const reference = refs.reference.current
+    const floating = refs.floating.current
+    if (reference === null || floating === null) return
+    const tokens = ['--dsl-g-surface', '--dsl-g-border', '--dsl-g-accent', '--dsl-g-hover', '--dsl-g-link']
+    const syncTheme = (): void => {
+      const source = getComputedStyle(reference)
+      for (const name of tokens) {
+        const value = source.getPropertyValue(name).trim()
+        if (value !== '') floating.style.setProperty(name, value)
+        else floating.style.removeProperty(name)
+      }
+    }
+    syncTheme()
+    const observer = new MutationObserver(syncTheme)
+    for (let element: HTMLElement | null = reference; element !== null; element = element.parentElement) {
+      observer.observe(element, { attributes: true, attributeFilter: ['class', 'style', 'data-theme', 'data-ds-dark-theme'] })
+    }
+    return () => observer.disconnect()
+  }, [open, refs])
+
   const click = useClick(context, { enabled: trigger === 'click' })
   const hover = useHover(context, { enabled: trigger === 'hover', handleClose: safePolygon() })
   const focus = useFocus(context)

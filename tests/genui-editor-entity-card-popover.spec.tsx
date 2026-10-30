@@ -112,6 +112,35 @@ describe('Editor, Entity Card, and Popover', () => {
     expect((await screen.findByRole('dialog')).textContent).toContain('Hover content.')
   })
 
+  it('shows the avatar when an entity image fails to load, and recovers for a new source', () => {
+    const first: GenuiSpec = { items: [{ type: 'entity-card', name: 'Example', image: '/missing.png' }] }
+    const view = render(<GenuiBlock spec={first} />)
+    fireEvent.error(screen.getByRole('img'))
+    expect(screen.queryByRole('img')).toBeNull()
+    expect(screen.getByText('E')).not.toBeNull()
+    view.rerender(<GenuiBlock spec={{ items: [{ type: 'entity-card', name: 'Example', image: '/working.png' }] }} />)
+    expect(screen.getByRole('img').getAttribute('src')).toBe('/working.png')
+  })
+
+  it('describes editor draft state without claiming persisted storage', () => {
+    const spec: GenuiSpec = { items: [{ type: 'editor', id: 'draft', value: 'Hello', label: 'Draft' }] }
+    render(<GenuiBlock spec={spec} />)
+    expect(screen.getByRole('status').textContent).toBeTruthy()
+    fireEvent.change(screen.getByRole('textbox', { name: 'Draft' }), { target: { value: 'Changed' } })
+    expect(screen.getByRole('status').textContent).toMatch(/updated|已更新/i)
+    expect(localStorage.getItem('dsh.genui.interaction')).toBeNull()
+  })
+
+  it('inherits the surrounding GenUI theme tokens in the portal', async () => {
+    const spec: GenuiSpec = { items: [{ type: 'popover', label: 'Info', content: 'Details' }] }
+    render(<GenuiBlock spec={spec} />)
+    const trigger = screen.getByRole('button', { name: 'Info' })
+    trigger.style.setProperty('--dsl-g-surface', 'rgb(12, 34, 56)')
+    fireEvent.click(trigger)
+    const panel = await screen.findByRole('dialog')
+    expect(panel.style.getPropertyValue('--dsl-g-surface')).toBe('rgb(12, 34, 56)')
+  })
+
   it('repairs unsafe entity links and rejects invalid popover settings', () => {
     const repaired = repairGenuiSpec({ items: [{
       type: 'entity-card', name: 'Example', image: 'javascript:alert(1)', href: 'javascript:alert(1)',

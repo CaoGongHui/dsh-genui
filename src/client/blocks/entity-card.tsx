@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react'
+import { useState, type ReactElement } from 'react'
 import type { GenuiEntityCard } from '../spec.ts'
 import { renderInline } from '../inline.ts'
 import { classifyLinkTarget } from '../file-link.ts'
@@ -15,6 +15,8 @@ export function EntityCardNode({ node, onAction }: { node: GenuiEntityCard; onAc
   const t = useT()
   const target = classifyLinkTarget(node.href)
   const image = safeMediaSrc(node.image)
+  const [failedImage, setFailedImage] = useState<string | undefined>()
+  const showImage = image !== undefined && failedImage !== image
   const sourceLabel = node.sourceLabel ?? t('block.entitySource')
   const source = target.type === 'external'
     ? <a className={css.source} href={target.href} target="_blank" rel="noopener noreferrer">{sourceLabel}</a>
@@ -23,8 +25,8 @@ export function EntityCardNode({ node, onAction }: { node: GenuiEntityCard; onAc
       : null
   return (
     <article className={css.card} data-genui-entity-card aria-label={t('block.entityCard')}>
-      {image !== undefined
-        ? <img className={css.image} src={image} alt={node.imageAlt ?? ''} loading="lazy" referrerPolicy="no-referrer" />
+      {showImage
+        ? <img className={css.image} src={image} alt={node.imageAlt ?? ''} loading="lazy" referrerPolicy="no-referrer" onError={() => setFailedImage(image)} />
         : <div className={css.avatar} aria-hidden="true" style={{ backgroundColor: avatarColor(node.name) }}>{Array.from(node.name)[0]?.toUpperCase()}</div>}
       <div className={css.body}>
         <h3 className={css.name}>{renderInline(node.name)}</h3>

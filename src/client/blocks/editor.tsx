@@ -12,11 +12,10 @@ export function EditorNode({ node, answers }: { node: GenuiEditor; answers?: Ans
   const id = useId()
   const [localValue, setLocalValue] = useState(node.value)
   const [copied, setCopied] = useState(false)
-  const [saved, setSaved] = useState(true)
+  const [edited, setEdited] = useState(false)
   const touched = useRef(false)
   const initialDraft = useRef(answers?.fields[node.id])
   const registeredDefault = useRef<string | undefined>(undefined)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const draft = answers?.fields[node.id]
   const value = initialDraft.current === undefined ? localValue : draft ?? localValue
 
@@ -32,16 +31,12 @@ export function EditorNode({ node, answers }: { node: GenuiEditor; answers?: Ans
     }
   }, [answers?.setField, node.id, node.value])
 
-  useEffect(() => () => clearTimeout(saveTimer.current), [])
-
   /** 更新当前文字，并通知区块状态保存草稿。 */
   const updateValue = (next: string): void => {
     touched.current = true
     setLocalValue(next)
     answers?.setField(node.id, next)
-    setSaved(false)
-    clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(() => setSaved(true), 350)
+    setEdited(true)
   }
 
   /** 将当前文字复制到剪贴板。 */
@@ -59,7 +54,7 @@ export function EditorNode({ node, answers }: { node: GenuiEditor; answers?: Ans
     <section className={css.editor} data-genui-editor>
       <div className={css.toolbar}>
         <label className={css.label} htmlFor={labelId}>{node.label ?? t('block.editor')}</label>
-        <span className={css.status} role="status">{saved ? t('block.editorSaved') : t('block.editorSaving')}</span>
+        <span className={css.status} role="status">{t(edited ? 'block.editorSaved' : 'block.editorSaving')}</span>
         <button type="button" className={css.copy} onClick={copyValue}>
           {copied ? t('label.copiedShort') : t('label.copy')}
         </button>
