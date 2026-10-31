@@ -10,6 +10,9 @@ sequence (`current: 0`, including the active and pending states). It covers host
 content font tokens of 14, 17 and 20px, inherited body line heights of 1.45 and
 2.1, 390px and 1100px viewports, and light/dark themes. Wrapped CJK titles and
 descriptions must remain clear of the marker and within the viewport.
+The long title includes Latin text so narrow-view wrapping is still exercised
+on CI images with different CJK font availability; the wrapping assertion stays
+required. This does not certify glyph coverage for missing system fonts.
 
 The rule is that each 24px marker has its own one-em line box: changing body
 leading must not move its text. Browser Range geometry checks containment in

@@ -21,7 +21,7 @@ if (params.get('palette') === 'host') {
 // own font default; neither case impersonates native Windows font rendering.
 if (params.get('palette') === 'host') document.body.style.fontFamily = 'var(--dsw-font-family)'
 const steps = ['一', '二', '三', '四'].map((title, index) => ({
-  title: index === 1 ? `${title} · 检查步骤标题在窄屏上的换行布局与说明可读性` : title,
+  title: index === 1 ? `${title} · 检查步骤标题在窄屏上的换行布局与说明可读性 · verify readable title wrapping at narrow viewport widths` : title,
   desc: `第${title}条：验证完成标记、当前步骤和待办序号，内容应完整保留。`,
 }))
 for (const font of [14, 17, 20]) {
