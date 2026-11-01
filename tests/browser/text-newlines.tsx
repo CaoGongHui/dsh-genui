@@ -41,6 +41,8 @@ interface Case {
   hostTableGeometry?: boolean
   issue326Geometry?: boolean
   narrowTableGeometry?: boolean
+  textWidthGeometry?: boolean
+  textCenterGeometry?: boolean
 }
 
 const cases: Case[] = []

@@ -71,7 +71,7 @@ try {
   await writeFile(join(out, 'results.json'), JSON.stringify(results, null, 2) + '\n')
   if (results.length !== 140) throw new Error(`Expected 140 browser layout checks, got ${results.length}`)
   const failed = results.filter(result => !result.pass)
-  if (failed.length > 0) throw new Error(`Browser newline regression failed:\n${JSON.stringify(failed, null, 2)}`)
+  if (failed.length > 0) throw new Error(`Browser text layout regression failed:\n${JSON.stringify(failed, null, 2)}`)
   await readFile(join(out, 'layout.png'))
   console.log(`Chromium text layout/selection check passed: ${results.length} checks`)
 } finally {
