@@ -348,8 +348,9 @@ body[data-ds-dark-theme] .panel {
 /* CJK reads looser than Latin at the same size: 1.7 for body copy, 1.65 for
    secondary lines, and no letter-spacing on Chinese runs (0.02em inserts
    visible gaps between Han characters). */
-/* ~65ch keeps a comfortable reading measure when the block is wide. */
-.text.body { font-size: var(--dsl-g-font-body); line-height: 1.7; color: var(--dsw-alias-label-primary); text-wrap: pretty; max-width: 68ch; }
+/* Keep body copy fluid: `ch` measures the width of "0", so a 68ch cap
+   leaves only about half the available measure for full-width CJK glyphs. */
+.text.body { font-size: var(--dsl-g-font-body); line-height: 1.7; color: var(--dsw-alias-label-primary); text-wrap: pretty; max-width: 100%; }
 .text.muted { font-size: var(--dsl-g-font-title); line-height: 1.65; color: var(--dsw-alias-label-secondary); }
 .text.caption { font-size: var(--dsl-g-font-meta); line-height: 1.6; color: var(--dsw-alias-label-secondary); }
 /* Display: the one-per-answer focal line (B1) — bigger than h1, carries the
@@ -360,7 +361,7 @@ body[data-ds-dark-theme] .panel {
   line-height: 1.25;
   letter-spacing: -0.02em;
 }
-.text.center { text-align: center; }
+.text.center { margin-inline: auto; text-align: center; }
 .text.left { text-align: left; }
 .text.right { text-align: right; }
 

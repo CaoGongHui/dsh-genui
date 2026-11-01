@@ -41,6 +41,8 @@ interface Case {
   hostTableGeometry?: boolean
   issue326Geometry?: boolean
   narrowTableGeometry?: boolean
+  textWidthGeometry?: boolean
+  textCenterGeometry?: boolean
 }
 
 const cases: Case[] = []
@@ -159,6 +161,19 @@ cases.push({
   node: { type: 'table', columns: ['A', 'B'], rows: [['one', 'two']] },
   selector: '', expected: '', whiteSpace: '', narrowTableGeometry: true,
 })
+cases.push({
+  name: 'CJK body text uses the full available width',
+  node: {
+    type: 'text', size: 'body',
+    content: '这是一段用于检查中文正文宽度的测试文本。每个汉字都占据接近一个 em 的宽度，正文应当使用容器提供的完整横向空间，并根据实际可用宽度自动换行。'.repeat(2),
+  },
+  selector: '', expected: '', whiteSpace: '', textWidthGeometry: true,
+})
+cases.push({
+  name: 'centered CJK body text aligns with the container center',
+  node: { type: 'text', size: 'body', align: 'center', content: '中文正文居中显示' },
+  selector: '', expected: '', whiteSpace: '', textCenterGeometry: true,
+})
 
 const tableLayout: GenuiNode = {
   type: 'table', columns: ['Group', 'Description'], types: ['group', 'text'],
@@ -174,7 +189,7 @@ flushSync(() => {
       <div id="fixtures">
         {cases.map((item, index) => (
           <section
-            className={`case${item.tableGeometry ? ' table-geometry' : ''}${item.hostTableGeometry ? ' host-table-geometry host-markdown' : ''}${item.issue326Geometry ? ' issue326-geometry' : ''}`}
+            className={`case${item.tableGeometry ? ' table-geometry' : ''}${item.hostTableGeometry ? ' host-table-geometry host-markdown' : ''}${item.issue326Geometry ? ' issue326-geometry' : ''}${item.textWidthGeometry ? ' text-width-geometry' : ''}${item.textCenterGeometry ? ' text-center-geometry' : ''}`}
             key={index}
             data-case={index}
           >
@@ -329,6 +344,34 @@ function measure(phase: string) {
           rowHeight, lineHeight, pass: rowHeight <= lineHeight * 5 + fontSize * 2,
         },
       ]
+    }
+    if (item.textWidthGeometry || item.textCenterGeometry) {
+      const fixture = document.querySelector<HTMLElement>(`[data-case="${index}"]`)
+      const reveal = fixture?.querySelector<HTMLElement>(`.${css.reveal}`)
+      const text = fixture?.querySelector<HTMLElement>(`.${css.text}.${css.body}`)
+      if (fixture == null || reveal == null || text == null) {
+        return { name: item.name, phase, pass: false, error: 'Missing text width fixture' }
+      }
+      const availableWidth = reveal.getBoundingClientRect().width
+      const textWidth = text.getBoundingClientRect().width
+      if (item.textWidthGeometry) {
+        return [{
+          name: item.name, phase, availableWidth, textWidth,
+          pass: Math.abs(availableWidth - textWidth) < 1,
+        }]
+      }
+      const range = document.createRange()
+      range.selectNodeContents(text)
+      const ink = range.getBoundingClientRect()
+      const container = reveal.getBoundingClientRect()
+      const inkCenter = (ink.left + ink.right) / 2
+      const containerCenter = (container.left + container.right) / 2
+      const textAlign = getComputedStyle(text).textAlign
+      return [{
+        name: item.name, phase, textAlign, inkCenter, containerCenter, textWidth, availableWidth,
+        pass: textAlign === 'center' && Math.abs(inkCenter - containerCenter) < 2
+          && Math.abs(availableWidth - textWidth) < 1,
+      }]
     }
     if (item.narrowTableGeometry) {
       const fixture = document.querySelector<HTMLElement>(`[data-case="${index}"]`)
