@@ -42,7 +42,9 @@ describe('GenUI image', () => {
     expect(unsafe.items).toEqual([])
 
     const { container: safeContainer, unmount } = render(<GenuiBlock spec={safe} />)
-    expect(safeContainer.querySelector('img')?.getAttribute('src')).toBe('https://cdn.example.com/result.png')
+    const safeImage = safeContainer.querySelector('img')
+    expect(safeImage?.getAttribute('src')).toBe('https://cdn.example.com/result.png')
+    expect(safeImage?.getAttribute('referrerpolicy')).toBe('no-referrer')
     unmount()
 
     const { container: unsafeContainer } = render(<GenuiBlock spec={unsafe} />)
