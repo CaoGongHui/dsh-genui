@@ -1930,11 +1930,13 @@ img.mediaPlayer { aspect-ratio: 16 / 9; object-fit: cover; background: var(--dsl
   --pele-radius: var(--dsl-g-radius-control);
 }
 .mermaid svg {
-  /* Both axes are capped: `max-width` stops a sparse diagram from becoming a
-     3000px-tall poster, `max-height` keeps a tall one on screen. The viewBox
-     keeps the aspect ratio, so the content letterboxes rather than stretches. */
-  width: 100%;
-  max-width: 720px;
+  /* Pele already lays the diagram out for the card width (`maxWidth`) and
+     emits its natural pixel size, so it is drawn at that size — never
+     stretched. Upstream's `width: 100%` (written for mermaid.js thumbnails)
+     scaled a 276px sequence diagram to ~600px and doubled its text. The
+     container still centres it; `max-height` keeps a tall one on screen and
+     the viewBox keeps the aspect ratio when either cap applies. */
+  max-width: 100%;
   max-height: 520px;
   height: auto;
 }
