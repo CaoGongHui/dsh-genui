@@ -192,6 +192,22 @@ describe('repairGenuiSpec: node-level healing', () => {
     expect(table.rows).toHaveLength(GENUI_LIMITS.maxTableRows)
   })
 
+  it('preserves table, list, and file-tree caps while skipping invalid entries', () => {
+    const rows = Array.from({ length: GENUI_LIMITS.maxTableRows }, (_, index) => [`row ${index}`])
+    const listItems = Array.from({ length: GENUI_LIMITS.maxListItems }, (_, index) => `item ${index}`)
+    const treeItems = Array.from({ length: GENUI_LIMITS.maxListItems }, (_, index) => ({ name: `node ${index}`, type: 'file' }))
+    const spec = repairGenuiSpec({ items: [
+      { type: 'table', columns: ['value'], rows: [null, ...rows] },
+      { type: 'list', items: [null, ...listItems] },
+      { type: 'file-tree', items: [null, ...treeItems] },
+    ] })
+    const [table, list, tree] = spec!.items as Array<{ rows?: unknown[]; items?: unknown[] }>
+
+    expect(table.rows).toHaveLength(GENUI_LIMITS.maxTableRows)
+    expect(list.items).toHaveLength(GENUI_LIMITS.maxListItems)
+    expect(tree.items).toHaveLength(GENUI_LIMITS.maxListItems)
+  })
+
   it('caps total node count', () => {
     const spec = repairGenuiSpec({ items: Array.from({ length: 500 }, (_, i) => text(`n${i}`)) })
     expect(spec!.items).toHaveLength(GENUI_LIMITS.maxNodes)
@@ -221,11 +237,10 @@ describe('repairGenuiSpec: node-level healing', () => {
     expect((spec!.items[0] as { type: string }).type).toBe('chart')
   })
 
-  it('passes unknown node types through untouched (custom components)', () => {
+  it('drops unsupported node types because the renderer has no custom component registry', () => {
     const custom = { type: 'my-widget', flavor: 'pink', data: { a: [1, 2] } }
     const spec = repairGenuiSpec({ items: [custom] })
-    expect(spec!.items).toHaveLength(1)
-    expect(spec!.items[0]).toEqual(custom)
+    expect(spec!.items).toEqual([])
   })
 
   it('sanitizes raw scalars inside collections', () => {
@@ -498,7 +513,7 @@ describe('validateGenuiSpec: diagnostics', () => {
     expect(result.errors.join('\n')).toContain(`${GENUI_LIMITS.maxNodes} nodes`)
   })
 
-  it('flags unknown types as custom-renderer warnings', () => {
+  it('rejects unknown types with a component diagnostic', () => {
     const result = validateGenuiSpec({ items: [{ type: 'my-widget' }] })
     expect(result.ok).toBe(false)
     expect(result.errors.join('\n')).toContain("unknown type 'my-widget'")

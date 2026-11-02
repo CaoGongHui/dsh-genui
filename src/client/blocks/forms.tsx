@@ -9,6 +9,7 @@ import css from '../GenuiBlock.module.css'
 import { GENUI_LIMITS } from '../genui-runtime/index.ts'
 import { useT } from '../i18n/index.ts'
 import { parseDecimalNumber } from '../safe-math.ts'
+import { isDatePickerValueValid } from '../date-picker.ts'
 import { resolveSubmitState } from '../submission-registry.ts'
 import type { RadioSubmissionMember } from '../submission-registry.ts'
 import type { AnswersState, GenuiBlockProps } from './state.ts'
@@ -78,6 +79,8 @@ export function correctLabelOf(m: RadioSubmissionMember): string | undefined {
   return m.answer
 }
 
+const EMPTY_KEYS: ReadonlySet<string> = new Set()
+
 /** 汇总当前 block 的表单状态，并根据 resolver 的结果提交或本地判卷。 */
 export function SubmitNode({ node, onAction, answers }: {
   node: GenuiSubmit
@@ -85,21 +88,32 @@ export function SubmitNode({ node, onAction, answers }: {
   answers?: AnswersState | undefined
 }) {
   const t = useT()
-  const recorded = answers?.answers ?? {}
-  const multiRecorded = answers?.multiAnswers ?? {}
-  const fields = answers?.fields ?? {}
+  // Values under a false `when` condition are invisible to the reader, so they
+  // are invisible to the submit too: excluded from the payload and from the
+  // required set (a hidden field must not look unanswered).
+  const hidden = answers?.hidden ?? EMPTY_KEYS
+  const visible = <T,>(record: Readonly<Record<string, T>>): Record<string, T> =>
+    Object.fromEntries(Object.entries(record).filter(([key]) => !hidden.has(key)))
+  const recorded = visible(answers?.answers ?? {})
+  const multiRecorded = visible(answers?.multiAnswers ?? {})
+  const fields = visible(answers?.fields ?? {})
   const validFields = Object.fromEntries(Object.entries(fields).filter(([id]) => !answers?.invalidNumericFields.has(id)))
-  const expected = node.groups
+  const expected = node.groups?.filter(group => !hidden.has(group))
   // One shared notion of "filled fields" for answered/ready/payload: non-blank
   // values only, secrets (password inputs) never collected into submit.
   const filledFields = Object.fromEntries(
-    Object.entries(validFields).filter(([id, v]) => v.trim() !== '' && !answers?.secretFields.has(id)),
+    Object.entries(validFields).filter(([id, v]) => {
+      if (v.trim() === '' || answers?.secretFields.has(id)) return false
+      const member = answers?.registry.members.get(id)
+      return member?.kind !== 'field' || member.fieldType !== 'date-picker'
+        || isDatePickerValueValid(v, member.datePicker?.mode ?? 'single', member.datePicker?.min, member.datePicker?.max)
+    }),
   )
   const resolved = answers === undefined ? { scope: [], answered: 0, total: expected?.length ?? 0, localGradeEligible: false, hasOutOfScopePayload: false }
     : resolveSubmitState({
       registry: answers.registry,
       ...(expected === undefined ? {} : { groups: expected }),
-      state: { answers: recorded, multiAnswers: multiRecorded, fields: validFields, secretFields: answers.secretFields },
+      state: { answers: recorded, multiAnswers: multiRecorded, fields: validFields, secretFields: answers.secretFields, hidden },
     })
   const { scope, answered, total } = resolved
   const canSendAction = node.action !== undefined && onAction !== undefined
@@ -107,7 +121,14 @@ export function SubmitNode({ node, onAction, answers }: {
   const submitted = answers?.locked === true
   const collectedAnswers: Record<string, string | string[]> = {
     ...recorded,
-    ...multiRecorded,
+    ...Object.fromEntries(Object.entries(multiRecorded).flatMap(([group, values]) => {
+      const member = answers?.registry.members.get(group)
+      if (member?.kind !== 'checkbox') return []
+      return [[group, values.flatMap(value => {
+        const label = member.choices.get(value)
+        return label === undefined ? [] : [label]
+      })]]
+    })),
   }
   // Ready = enough answers AND the click can do something: either local
   // grading, or a real action name + provider. A submit with neither is a
@@ -409,12 +430,7 @@ export function InputNode({ node, onAction, answers }: {
   // used to fire a pointless action round trip). Seeded with the mount value
   // so the very first unedited blur also stays silent.
   const lastSent = useRef<string | null>(value)
-  const registeredFieldId = useRef(id)
   const setField = answers?.setField
-  const setNumericFieldValidity = answers?.setNumericFieldValidity
-  useEffect(() => () => {
-    if (id !== undefined) setNumericFieldValidity?.(id, true)
-  }, [id, setNumericFieldValidity])
   const send = (submit: boolean): void => {
     if (numeric && value.trim() !== '' && parseDecimalNumber(value) === undefined) return
     if (action !== undefined && onAction !== undefined) {
@@ -423,22 +439,10 @@ export function InputNode({ node, onAction, answers }: {
     }
   }
   const ime = useImeComposing()
-  // 流式规格改变控件类型或 ID 时，同步更新共享字段状态。
+  // renderNode 按字段标识和类型设置输入项身份，流式更新或切换标签页后不会串到其他字段。
   useEffect(() => {
-    const previousId = registeredFieldId.current
-    if (previousId !== id && previousId !== undefined) setNumericFieldValidity?.(previousId, true)
-    registeredFieldId.current = id
-    if (id !== undefined) {
-      const valid = !numeric || value.trim() === '' || parseDecimalNumber(value) !== undefined
-      setNumericFieldValidity?.(id, valid)
-      if (!secret && value.trim() !== '' && valid) setField?.(id, value)
-    }
-  }, [id, numeric, value, secret, setField, setNumericFieldValidity])
-  // Secret fields are filtered from persistence and submit collection.
-  useEffect(() => {
-    if (secret && id !== undefined) answers?.registerSecretField(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [secret, id])
+    if (!secret && id !== undefined && value.trim() !== '') setField?.(id, value)
+  }, [id, value, secret, setField])
   return (
     <label className={css.field}>
       {node.label !== undefined && <span>{renderInline(node.label, false)}</span>}
@@ -459,13 +463,7 @@ export function InputNode({ node, onAction, answers }: {
         onChange={e => {
           const v = e.currentTarget.value
           setValue(v)
-          if (id !== undefined) {
-            if (numeric) {
-              const valid = v.trim() === '' || parseDecimalNumber(v) !== undefined
-              answers?.setNumericFieldValidity(id, valid)
-              if (valid) answers?.setField(id, v)
-            } else answers?.setField(id, v)
-          }
+          if (!secret && id !== undefined) answers?.setField(id, v)
         }}
         onBlur={() => {
           if (value !== lastSent.current) send(false)

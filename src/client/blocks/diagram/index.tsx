@@ -9,12 +9,15 @@
  * @module @changfenhuang/dsh-genui/client/blocks/diagram
  */
 import { renderInline } from '../../inline.ts'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react'
+import css from '../../GenuiBlock.module.css'
 import type { GenuiDiagram } from '../../spec.ts'
+import type { AnswersState } from '../state.ts'
 import { GENUI_LIMITS } from '../../genui-runtime/index.ts'
 import { resolveLayout } from './layout.ts'
 import { routeEdge, labelGeometry, type Box } from './geometry.ts'
 import { resolvePalette, nodeTreatment, edgeStroke, inkAt } from './theme.ts'
+import { t, type GenuiTextKey } from '../../i18n/index.ts'
 
 const FONT_SANS = "'Geist', -apple-system, 'Segoe UI', sans-serif"
 const FONT_MONO = "'Geist Mono', ui-monospace, 'SF Mono', monospace"
@@ -23,13 +26,15 @@ const FONT_MONO = "'Geist Mono', ui-monospace, 'SF Mono', monospace"
 const NODE_H = 64 // node box height (48→64 for the editorial ramp)
 const LEGEND_COL_W = 150
 const LEGEND_ROW_H = 22
-const LEGEND_ITEMS: Array<{ label: string; type: string | undefined }> = [
-  { label: 'Focal', type: 'focal' },
-  { label: 'Backend', type: 'backend' },
-  { label: 'Store', type: 'store' },
-  { label: 'External', type: 'external' },
-  { label: 'Optional', type: 'optional' },
-  { label: 'Security', type: 'security' },
+/** Legend labels resolve per call from the active dictionary: a frozen label
+ *  kept printing LEGEND / Focal / Backend in the middle of a Chinese answer. */
+const LEGEND_ITEMS: Array<{ key: GenuiTextKey; type: string | undefined }> = [
+  { key: 'dgm.legend.focal', type: 'focal' },
+  { key: 'dgm.legend.backend', type: 'backend' },
+  { key: 'dgm.legend.store', type: 'store' },
+  { key: 'dgm.legend.external', type: 'external' },
+  { key: 'dgm.legend.optional', type: 'optional' },
+  { key: 'dgm.legend.security', type: 'security' },
 ]
 
 /**
@@ -51,6 +56,7 @@ function renderNodeBox(
   sub: string | undefined,
   type: string | undefined,
   tag: string | undefined,
+  selected: boolean,
   palette: ReturnType<typeof resolvePalette>,
 ): React.ReactNode {
   const treatment = nodeTreatment(type, palette)
@@ -70,8 +76,8 @@ function renderNodeBox(
         height={box.h}
         rx={6}
         fill={treatment.fill}
-        stroke={treatment.stroke}
-        strokeWidth={1}
+        stroke={selected ? palette.accent : treatment.stroke}
+        strokeWidth={selected ? 2.5 : 1}
         strokeDasharray={treatment.dashed === true ? '5,4' : undefined}
       />
       {tag !== undefined && (
@@ -169,11 +175,11 @@ function renderZone(z: { label: string; x: number; y: number; w: number; h: numb
 }
 
 /** Legend strip at the bottom: hairline separator + treatment swatches. */
-function renderLegend(palette: ReturnType<typeof resolvePalette>, items: typeof LEGEND_ITEMS, width: number, cols: number): React.ReactNode {
+function renderLegend(palette: ReturnType<typeof resolvePalette>, items: ReadonlyArray<{ label: string; type: string | undefined }>, width: number, cols: number): React.ReactNode {
   return (
     <g>
       <line x1={40} y1={0} x2={Math.max(120, width - 40)} y2={0} stroke={inkAt(palette.ink, 0.10)} strokeWidth={0.8} />
-      <text x={40} y={16} fill={palette.soft} fontSize={8} fontFamily={FONT_MONO} letterSpacing={1.6}>LEGEND</text>
+      <text x={40} y={16} fill={palette.soft} fontSize={8} fontFamily={FONT_MONO} letterSpacing={1.6}>{t('dgm.legend')}</text>
       {items.map((item, i) => {
         const t = nodeTreatment(item.type, palette)
         const x = 40 + (i % cols) * LEGEND_COL_W
@@ -202,9 +208,16 @@ function nextUid(): string {
   return `genui-diagram-${uidCounter}`
 }
 
-/** The `diagram` node renderer. */
-export function DiagramNode({ node }: { node: GenuiDiagram }) {
+/** 渲染可选择的图解，并通过共享字段保存所选节点。 */
+export function DiagramNode({ node, answers }: { node: GenuiDiagram; answers?: AnswersState | undefined }) {
   const uid = useMemo(nextUid, [])
+  const [localSelection, setLocalSelection] = useState<{ scope: string | undefined; id: string }>({ scope: node.id, id: '' })
+  const storedSelection = node.id === undefined ? undefined : answers?.fields[node.id]
+  const scopedSelection = localSelection.scope === node.id ? localSelection.id : ''
+  const candidate = storedSelection ?? scopedSelection
+  const selectableNodes = node.nodes.slice(0, GENUI_LIMITS.maxDiagramNodes)
+  const selected = selectableNodes.some(item => item.id === candidate) ? candidate : ''
+  const selectedNode = selectableNodes.find(item => item.id === selected)
   // CSS token references follow the surrounding theme without remounting SVG nodes.
   const palette = useMemo(() => resolvePalette(node.variant, node.theme), [node.variant, node.theme])
   const layout = useMemo(() => resolveLayout(node, buildParentMap(node.edges ?? [])), [node])
@@ -221,6 +234,38 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
   const edges = layout.edges.slice(0, GENUI_LIMITS.maxDiagramEdges)
   const zones = (node.zones ?? []).slice(0, GENUI_LIMITS.maxDiagramZones)
 
+  useEffect(() => {
+    if (node.id !== undefined && storedSelection === undefined && localSelection.scope === undefined && localSelection.id !== '') {
+      answers?.setField(node.id, localSelection.id)
+      setLocalSelection({ scope: node.id, id: localSelection.id })
+      return
+    }
+    if (localSelection.scope !== node.id && localSelection.id !== '') {
+      setLocalSelection({ scope: node.id, id: '' })
+      return
+    }
+    if (selected === '' && scopedSelection !== '') {
+      setLocalSelection({ scope: node.id, id: '' })
+      return
+    }
+    if (candidate === selected) return
+    setLocalSelection({ scope: node.id, id: '' })
+    if (node.id !== undefined && candidate !== '') answers?.setField(node.id, '')
+  }, [answers, candidate, localSelection, node.id, selected, storedSelection])
+
+  /** 在本地保存节点选择，并通过稳定 ID 更新周边组件。 */
+  function selectNode(id: string): void {
+    setLocalSelection({ scope: node.id, id })
+    if (node.id !== undefined) answers?.setField(node.id, id)
+  }
+
+  /** 使用原生按钮的键盘操作激活节点。 */
+  function handleNodeKeyDown(event: KeyboardEvent<SVGGElement>, id: string): void {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    selectNode(id)
+  }
+
   // Focal budget: accent on 1–2 nodes max; extra focal nodes downgrade to backend.
   let focalSeen = 0
   const focalBudget = GENUI_LIMITS.maxDiagramFocal
@@ -230,8 +275,10 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
   // Legend: only the types this diagram actually uses, wrapped to the canvas
   // width (the old fixed 170px pitch + hardcoded 1000px rule overflowed any
   // narrow canvas and printed "Extern…").
-  const legendItems = LEGEND_ITEMS.filter(item => item.type !== undefined
-    && nodes.some(n => (n.node.type ?? 'backend') === item.type))
+  const legendItems = LEGEND_ITEMS
+    .filter(item => item.type !== undefined
+      && nodes.some(n => (n.node.type ?? 'backend') === item.type))
+    .map(item => ({ label: t(item.key), type: item.type }))
   const legendCols = Math.max(1, Math.floor((layout.width - 40) / LEGEND_COL_W))
   const legendRows = Math.max(1, Math.ceil(legendItems.length / legendCols))
   const legendH = 24 + legendRows * LEGEND_ROW_H
@@ -240,16 +287,25 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
   return (
     <figure className="genui-diagram" data-genui-diagram>
       {node.title !== undefined && (
-        <figcaption id={captionId} style={{ fontFamily: "Instrument Serif, 'Times New Roman', serif", fontSize: 20, marginBottom: 8, color: palette.ink }}>
+        <figcaption id={captionId} style={{ fontFamily: 'inherit', fontSize: 'var(--dsl-g-font-h3)', fontWeight: 600, lineHeight: 1.4, marginBottom: 10, color: palette.ink }}>
           {renderInline(node.title)}
         </figcaption>
       )}
       <svg
-        role="img"
+        role="group"
         aria-labelledby={titleId}
         aria-describedby={descId}
         viewBox={`0 0 ${layout.width} ${canvasH}`}
-        style={{ maxWidth: '100%', height: 'auto', background: palette.paper }}
+        style={{
+          maxWidth: '100%',
+          height: 'auto',
+          background: palette.paper,
+          /* Match the card surface the diagram sits next to: same radius, same
+             hairline. A full-bleed square slab read as an image pasted into the
+             answer rather than a component of it. */
+          borderRadius: 'var(--dsl-g-radius-surface)',
+          border: '1px solid var(--dsl-g-border)',
+        }}
       >
         <title id={titleId}>{node.title ?? node.kind}</title>
         <desc id={descId}>{`${node.kind} diagram with ${nodes.length} nodes and ${edges.length} connectors`}</desc>
@@ -277,8 +333,18 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
             const effectiveType = l.node.type === 'focal' && focalSeen >= focalBudget ? undefined : l.node.type
             if (l.node.type === 'focal') focalSeen += 1
             return (
-              <g key={l.node.id}>
-                {renderNodeBox(l.box, l.node.label, l.node.sub, effectiveType, l.node.tag, palette)}
+              <g
+                key={l.node.id}
+                className={css.diagramNode}
+                role="button"
+                tabIndex={0}
+                aria-label={l.node.label}
+                aria-pressed={selected === l.node.id}
+                data-selected={selected === l.node.id}
+                onClick={() => selectNode(l.node.id)}
+                onKeyDown={event => handleNodeKeyDown(event, l.node.id)}
+              >
+                {renderNodeBox(l.box, l.node.label, l.node.sub, effectiveType, l.node.tag, selected === l.node.id, palette)}
               </g>
             )
           })}
@@ -288,6 +354,15 @@ export function DiagramNode({ node }: { node: GenuiDiagram }) {
           {renderLegend(palette, legendItems, layout.width, legendCols)}
         </g>
       </svg>
+      {selectedNode !== undefined && (
+        <section className={css.diagramDetails} aria-live="polite">
+          <span className={css.diagramDetailsHeading}>{t('dgm.details')}</span>
+          <strong>{selectedNode.label}</strong>
+          {(selectedNode.description ?? selectedNode.sub) !== undefined && (
+            <div>{renderInline(selectedNode.description ?? selectedNode.sub ?? '')}</div>
+          )}
+        </section>
+      )}
     </figure>
   )
 }

@@ -97,7 +97,7 @@ async function lifecycle({ root, host, env, own, snapshotReport }) {
   const cwd = join(root, 'workspace')
   const fixture = await prepareFixture(root, host)
   const launch = async (phase, patchFile) => {
-    const process = spawnOwned(globalThis.process.execPath, [host.bin, 'web', '--patch', patchFile, '--port', '0', '--no-open'], { cwd, env, label: `${phase} official rc.2 host`, expectedStopCode: 130 })
+    const process = spawnOwned(globalThis.process.execPath, [host.bin, 'web', '--patch', patchFile, '--port', '0', '--no-open'], { cwd, env, label: `${phase} official rc.3 host`, expectedStopCode: 130 })
     const stop = async () => {
       const result = await process.stop()
       assert.deepEqual(await json(join(fixture.output, `fixture-${phase}-disposed.json`)),
@@ -163,15 +163,17 @@ async function lifecycle({ root, host, env, own, snapshotReport }) {
   }
   const bindUiAwaySession = async sessionId => {
     assert.equal(uiAway, undefined, 'Only one UI away session can be bound')
-    uiAway = validateUiAway({ sessionId, workspaceId: workspace.workspaceId }, [...IDS, AWAY_ID])
+    uiAway = validateUiAway({ sessionId, workspaceId: workspace.workspaceId }, AWAY_ID)
     await readBackendSnapshot({ expected: initialExpected() })
     return { ...uiAway, durableRelevantEvents: 0, actions: 0, completedTurns: [] }
   }
   return { ...resume, origin, seed, workspaceId: workspace.workspaceId, seedExit, readBackendSnapshot, waitForBackendAction,
     bindUiAwaySession, uiAway: () => uiAway }
 }
-async function setupRoot(own) {
-  const root = await mkdtemp(join(tmpdir(), 'dsh354-owned-'))
+export async function setupRoot(own) {
+  // The host canonicalizes workspace paths; compare ownership against the
+  // same path even when TMPDIR uses a symlink (such as /var on macOS).
+  const root = await realpath(await mkdtemp(join(tmpdir(), 'dsh354-owned-')))
   own(() => rm(root, { recursive: true, force: true }))
   const env = sidechatSmokeEnvironment(process.env, root)
   await Promise.all(['workspace', 'tool-home', 'home', 'cache', 'config', 'tmp'].map(name => mkdir(join(root, name))))
@@ -221,7 +223,7 @@ export async function runSidechatAcceptance(options) {
         parentId: IDS[0], childIds: IDS.slice(1), awaySessionId: AWAY_ID, workspaceId: run.workspaceId, seed: run.seed, bindUiAwaySession: run.bindUiAwaySession,
         readBackendSnapshot: run.readBackendSnapshot, waitForBackendAction: run.waitForBackendAction, report: {} }), 300000, 'Mandatory browser acceptance callback')
       assert.equal(browserReport?.status, 'passed-real-host-checks', 'Mandatory browser callback must attest all checks')
-      assert.ok(run.uiAway(), 'Actual native UI-created away must be durably bound')
+      assert.ok(run.uiAway(), 'Actual native UI-reused away must be durably bound')
       const final = await run.readBackendSnapshot({ stage: 'host-final', expected: finalExpected() })
       await delay(1000) // Bounded trailing debounce/duplicate observation window.
       assert.deepEqual(await run.readBackendSnapshot({ stage: 'host-quiet-reread', expected: finalExpected() }), final)

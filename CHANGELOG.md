@@ -2,9 +2,68 @@
 
 ## [Unreleased]
 
+### 新增
+
+- 新增 `date-picker` 日期和日期范围选择，校验 ISO 日期与可选范围；新增 `segmented-control` 胶囊式选项，可通过共享字段联动其他组件（#358）。
+- 新增 `table.wrap`：长文本、长标识符和行内代码可按列折行，保留代码空白和显式换行；列宽不足时继续横向滚动，嵌套表格独立决定是否换行。默认关闭（#382）。
+
 ### 变更
 
 - **图表引擎从 Mermaid.js 换成 Pele**：`mermaid` 节点改由 [Pele](https://github.com/obsidianmd/pele)（MIT，Obsidian 出品）把 Mermaid 12.1 语法渲染成 SVG。按需资产 `lib/assets/mermaid.js`（3.4 MB）换成 `lib/assets/pele.js`（310 kB / gzip 113 kB，只注册白名单内的 9 种图），渲染由异步布局改为同步输出，配色从 `themeVariables` 改为 `.mermaid` 上的 `--pele-*` → 宿主 `--dsw-alias-*` 桥接，切主题只换 CSS 变量、不再重绘；`mermaid` devDependency、`mermaid-core.ts`、`asset-mermaid.ts`、`mermaid-colors.ts` 与 `check-mermaid-browser.mjs` 基准脚本一并移除。种类白名单、`ensureFlowchartKind`、`repairMermaidSource`、`assertSafeSvg` 出口检查保持不变。
+
+### 修复
+
+- `steps` 的完成勾号和数字角标固定自身行高，不再被宿主的 CJK 正文高行高推向底边；保留步骤标题和说明的原有排版（#410）。
+- 深色主题下 `blocks` 的语义格和默认强调格使用独立的 28% 底纹，语义边框提高到 50%，让混淆矩阵等密集图解更容易区分；保留浅色外观、显式颜色优先级及其他组件的焦点和数据强调强度（#408）。
+- 未知或 PascalCase 组件类型不再被校验工具误报为有效或已渲染；缺少 `tabs[].items` 会得到字段错误。面板写入和恢复经过同一校验，坏缓存不会覆盖有效快照，追加操作继续支持乱序计算引用；补齐 `card.body` / `grid.columns` 别名诊断（#390）。
+- `stat` / `hero` 保留 `1,6328`、`99,9%` 等逗号小数，不再错误放大数值；符合既有千分位格式的 `1,234`、`1,632.80` 继续按原规则显示（#388）。
+- 宿主画布不再是不透明纯色时（背景图 / 玻璃态皮肤），`callout` 与带 `tone` 的 `card` 的语义底色改为叠在实心表面之上的一层染色，不再把表面替换成半透明 wash，正文不会被背景花纹透穿（#398）。深色主题下这两类表面因此比之前亮一层（染色基准从页面色变为卡面色），属观感调整。
+- 新增 `--dsh-genui-surface` 覆盖变量：皮肤可在 `:root` / `body` 一次性指定表面色（允许带 alpha），不必再改宿主的 `--dsw-alias-bg-layer-*`。此前在 `:root` 覆盖 `--dsl-g-surface` 会被 `.block` 自身的声明遮蔽而静默失效。
+- `table` 与 `card.flat` 增加按需填充变量 `--dsh-genui-surface-table`（默认 `transparent`）和 `--dsh-genui-surface-flat`（默认 2.5% 淡色）：默认观感完全不变，非不透明画布上的皮肤可把两者指向 `var(--dsh-genui-surface)` 升级为实底（#398）。
+
+## [0.15.0] - 2026-10-28
+
+### 新增
+
+- 新增 `carousel` 横向卡片轮播和 `image-group` 图片集合，支持响应式排版、图片放大浏览和键盘切换（#359）。
+- 新增 `computed` 响应式计算字段，输入变化后更新关联文字、指标、图表和表格；表达式支持依赖检查、格式化和错误提示（#361）。
+- 新增网页 `map` 交互地图：地点列表与标记联动、缩放、重置视图和内联路线；选择保持本地交互，通过独立提交按钮发送地点 ID。默认提供无外部底图的坐标地图，地图引擎按需加载，支持独立 HTML 导出（#362）。
+- 新增 dsh-go 原生接入，使用 App 已有的工具卡、正文选择和插件面板，无需修改 App。原生面板支持选择、开关、提交、本地判卷和复制；自由输入、地图及高级图形等能力会明确提示限制（#379）。
+- 增加侧边对话显式接入及通用 `genuiSidechat` surface adapter，渲染与操作按所属子线程隔离；BetterSidebar 使用其配套 service（#360、#367）。
+- 表格普通文本、徽章、变化值及分组和详情首格支持安全外链，点击链接不会同时切换分组或详情状态（#357）。
+
+### 修复
+
+- SVG 超过 12,000 字符时，验证工具报告字段路径、实际长度和上限，要求精简或拆分；不再把文档截成损坏的 XML。直接渲染与裸 SVG 围栏也在解析前显示超限提示（#378）。
+- 围栏 JSON 支持修复结构位置的全角逗号、顿号、分号和冒号，保留字符串内的原始标点，并与引号及缺失括号修复共用解析规则（#369）。
+- Mermaid 管道边标签中的裸 `@` 自动加引号；修复只作用于实际边标签，保留节点文字、已有引号和注释（#366）。
+- 屏幕外的 Mermaid 图表不再反复同步检查主题，减少无效布局计算（#377）。
+- JSON 成员键被写成 `["key"]:` 时，可在完整解析通过后还原为 `"key":`；同时包含其他结构错误时保留诊断，要求重发（#375）。
+- 地图位于未选中的页签时，已删除地点也会从提交、快照和持久化状态中清空；重新加入该地点不会恢复旧选择。
+- 保持跨页签输入字段的稳定身份，防止密码内容进入普通字段。
+- 无效数字输入隐藏后不再提交旧值；动态复选框更新文案时保留选中状态。
+- 面板追加先按顺序合并再验证计算引用，无法解决的引用显示错误。
+- 图表缺失数据保留对应位置，避免绘制成真实零值。
+- 滑块显示值与提交精度保持一致，避免界面显示的数字和实际发送值不同（#353）。
+- 交互操作的转发提示跟随会话语言，避免向模型发送固定英文提示（#364）。
+- 宿主内容字号超过 17px 时，卡片、函数图和 ECharts 预设文字按比例放大，并保留原字号下限；调整字号时保留图例选择和缩放位置（#372）。
+- 表格行、列表项和文件树节点超过数量上限时，校验工具报告实际截断数量；已截掉的字段不会再导致提交校验冲突（#373）。
+
+### 兼容性
+
+- 将当前宿主的公开依赖、安装包验收和双插件验收目标更新为 DSH `0.2.1-rc.3`，继续保留 `0.2.0-rc.1` 最低版本检查。
+- 支持 DSH `0.2.2-alpha.2`，对齐其 Cordis 依赖与原生工具执行器；CI 和发布任务从 npm 安装精确宿主，验收同一插件包的正文渲染、图片集合、计算字段与地图交互。alpha 宿主要求 Node.js >=24.9.0；第三方侧栏接入仍在 rc.3 上验收。
+- 将 npm `next` 的 DSH `0.2.1-rc.4` 纳入 CI 和发布前的公开接口、完整单元测试及构建检查；继续保留 rc.3 和最低版本宿主验证。
+- DSH `0.2.1-rc.3` 复用工作区现有空白会话；双插件验收核对请求、响应、选中行和持久化记录对应同一会话。
+- BetterSidebar 侧边对话渲染需要提供 `registerSidechatSurfaceAdapter` 的配套发布版本；DSH 原生 Side Chat 需要 provider 提供 `genuiSidechat`。
+
+### 致谢
+
+- 感谢 [@tinysunspot](https://github.com/tinysunspot) 对全角标点问题的定位与修复建议（[#369](https://github.com/omdsh-dev/dsh-genui/issues/369)），以及 [@Ananpng123](https://github.com/Ananpng123) 对 Mermaid 边标签问题的报告和 [@sunxiuguo](https://github.com/sunxiuguo) 补充的节点内容反例（[#366](https://github.com/omdsh-dev/dsh-genui/issues/366)）。
+- 感谢 [@Taza67](https://github.com/Taza67) 在 [#368](https://github.com/omdsh-dev/dsh-genui/pull/368) 中提交宿主字号跟随的早期实现与问题分析；该改进最终通过 [#372](https://github.com/omdsh-dev/dsh-genui/pull/372) 合入。
+- 感谢 [@wang-kaopu](https://github.com/wang-kaopu) 对字号适配（[#372](https://github.com/omdsh-dev/dsh-genui/pull/372)）与截断诊断（[#373](https://github.com/omdsh-dev/dsh-genui/pull/373)）的贡献。
+- 感谢 [@TomXPRIME](https://github.com/TomXPRIME) 对 SVG 超限截断问题的报告（[#378](https://github.com/omdsh-dev/dsh-genui/issues/378)）。
+- 感谢 [@sunxiuguo](https://github.com/sunxiuguo) 的地图实现（[#362](https://github.com/omdsh-dev/dsh-genui/pull/362)）；原始提交与作者署名保留在集成历史中。响应式计算（#361）与通用侧边对话接入（#367）由 [@wang-kaopu](https://github.com/wang-kaopu) 贡献。
 
 ## [0.14.0] - 2026-10-21
 

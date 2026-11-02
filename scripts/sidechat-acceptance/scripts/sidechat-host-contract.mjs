@@ -5,7 +5,7 @@ import { readFile, realpath, stat } from 'node:fs/promises'
 import { dirname, isAbsolute, join, relative, sep } from 'node:path'
 import { createRequire } from 'node:module'
 
-export const HOST_VERSION = '0.2.1-rc.2'
+export const HOST_VERSION = '0.2.1-rc.3'
 export const IDS = Object.freeze(['session-e2e-dsh354-parent', 'session-e2e-dsh354-thread-a', 'session-e2e-dsh354-thread-b'])
 export const PROVIDER = 'dsh354-replay'
 export const MODEL = 'dsh354-fixture'
@@ -37,13 +37,13 @@ export async function verifyTarball(file, expected) {
   return sha256
 }
 
-export async function resolveExactHost({ dshRoot, dshBin, hostLayout = 'source' }) {
+export async function resolveExactHost({ dshRoot, dshBin, hostLayout = 'source', expectedVersion = HOST_VERSION }) {
   assert.ok(['source', 'registry'].includes(hostLayout), 'Explicit source or registry host layout required')
   const root = await realpath(dshRoot), bin = await realpath(dshBin)
   const cliPackage = await realpath(hostLayout === 'source' ? join(root, 'apps/cli/package.json') : join(root, 'node_modules/@deepseek-ai/dsh/package.json'))
   assert.ok(isChildPath(root, cliPackage) && isChildPath(root, bin), 'CLI must belong to exact host root')
   const host = JSON.parse(await readFile(cliPackage, 'utf8'))
-  assert.equal(host.name, '@deepseek-ai/dsh'); assert.equal(host.version, HOST_VERSION, 'Only exact rc.2 is covered')
+  assert.equal(host.name, '@deepseek-ai/dsh'); assert.equal(host.version, expectedVersion, 'Expected exact host version')
   assert.equal(bin, await realpath(join(dirname(cliPackage), 'lib/bin.js')), 'Use exact official built bin.js, not an unrelated executable/shim')
   const require = createRequire(cliPackage)
   const modules = {}
@@ -56,7 +56,7 @@ export async function resolveExactHost({ dshRoot, dshBin, hostLayout = 'source' 
     entry = await realpath(entry)
     assert.ok(isChildPath(root, entry), 'Built dependency escaped the exact host graph')
     const pkg = JSON.parse(await readFile(join(dirname(dirname(entry)), 'package.json'), 'utf8'))
-    assert.equal(pkg.name, name); assert.equal(pkg.version, HOST_VERSION, 'Mixed host graph refused')
+    assert.equal(pkg.name, name); assert.equal(pkg.version, expectedVersion, 'Mixed host graph refused')
     assert.ok((await stat(entry)).isFile()); modules[key] = entry
   }
   return { root, bin, hostVersion: host.version, hostLayout, modules }

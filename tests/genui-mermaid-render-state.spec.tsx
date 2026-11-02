@@ -142,6 +142,34 @@ describe('Mermaid render state', () => {
     expect(renderMermaidMock).toHaveBeenCalledTimes(2)
   })
 
+  it('skips theme style reads while offscreen, before and after rendering', async () => {
+    const intersect = viewport()
+    const styles = vi.spyOn(window, 'getComputedStyle')
+    renderMermaidMock.mockResolvedValue('<svg/>')
+    const view = render(<MermaidNode node={node('graph TD\nA --> B')} />)
+    await act(async () => {})
+    expect(styles).not.toHaveBeenCalled()
+
+    await act(async () => { document.body.style.setProperty('--unrelated', '1') })
+    expect(styles).not.toHaveBeenCalled()
+    expect(renderMermaidMock).not.toHaveBeenCalled()
+
+    intersect(true)
+    await waitFor(() => expect(view.container.querySelector('svg')).not.toBeNull())
+    expect(styles).toHaveBeenCalled()
+    expect(renderMermaidMock).toHaveBeenCalledTimes(1)
+
+    intersect(false)
+    styles.mockClear()
+    await act(async () => { document.body.style.setProperty('--dsw-alias-label-primary', '#ffffff') })
+    expect(styles).not.toHaveBeenCalled()
+    expect(renderMermaidMock).toHaveBeenCalledTimes(1)
+
+    intersect(true)
+    await waitFor(() => expect(renderMermaidMock).toHaveBeenCalledTimes(2))
+    expect(styles).toHaveBeenCalled()
+  })
+
   it('keeps observing the same root after rendering and refreshes theme after reentry', async () => {
     const intersect = viewport()
     renderMermaidMock

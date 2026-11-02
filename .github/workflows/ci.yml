@@ -16,10 +16,10 @@ jobs:
             host-ref: "dsh-v0.2.0-rc.1"
             role: minimum
           - node: 22
-            host-ref: "dsh-v0.2.1-rc.2"
+            host-ref: "dsh-v0.2.1-rc.3"
             role: current
           - node: 24
-            host-ref: "dsh-v0.2.1-rc.2"
+            host-ref: "dsh-v0.2.1-rc.3"
             role: current
     runs-on: ubuntu-latest
     timeout-minutes: 40
@@ -43,11 +43,37 @@ jobs:
           test -f "$DSH_ROOT/packages/client/ui-primitives/src/index.ts" || { echo "::error::宿主预检失败：ui-primitives 源码缺失"; exit 1; }
           echo "HOST_SHA=$(git -C "$DSH_ROOT" rev-parse HEAD)" >> "$GITHUB_ENV"
 
+      # Reuse a completed store for the same immutable host and package manager.
+      # SheetJS CDN timeouts must not repeatedly prevent the other runtime lane
+      # from reaching plugin checks; pnpm still verifies the frozen lockfile.
+      - name: Locate current host dependency store
+        if: matrix.role == 'current'
+        id: host_store
+        working-directory: ${{ github.workspace }}/../../.dsh/source/current
+        run: |
+          echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+          echo "manager=$(pnpm --version)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore current host dependencies
+        if: matrix.role == 'current'
+        id: host_dependencies
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.host_store.outputs.path }}
+          key: dsh-host-${{ runner.os }}-${{ runner.arch }}-pnpm${{ steps.host_store.outputs.manager }}-${{ env.HOST_SHA }}
+
       - name: Install + build host
         working-directory: ${{ github.workspace }}/../../.dsh/source/current
         run: |
           pnpm install --frozen-lockfile
           pnpm run build
+
+      - name: Save completed current host dependencies
+        if: success() && matrix.role == 'current' && steps.host_dependencies.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.host_store.outputs.path }}
+          key: ${{ steps.host_dependencies.outputs.cache-primary-key }}
 
       - name: Install plugin dependencies
         run: pnpm install --frozen-lockfile
@@ -58,6 +84,11 @@ jobs:
 
       - name: Check published host API (typecheck + full unit suite + build)
         run: pnpm run check:host-api "${{ matrix.host-ref }}"
+
+      # rc.4 is on npm next; retain rc.3 for source-host browser acceptance.
+      - name: Check next published host API
+        if: matrix.role == 'current'
+        run: pnpm run check:host-api dsh-v0.2.1-rc.4
 
       - name: Verify and pack plugin tarball
         id: pack
@@ -73,7 +104,28 @@ jobs:
           DSH_ROOT: ${{ github.workspace }}/../../.dsh/source/current
           DSH_BIN: ${{ github.workspace }}/../../.dsh/source/current/apps/cli/lib/bin.js
 
-      - name: Archive gallery browser evidence
+      # Existing host matrix + verified tarball. This mode requires normal
+      # Chrome sandboxes and the supported software OpenGL ES driver; no unsafe
+      # WebGL fallback, new permissions, model credentials, or external service.
+      - name: Map real browser acceptance (sandboxed, no model key)
+        run: node scripts/e2e.mjs --smoke --map --install tarball --tarball "${{ steps.pack.outputs.tarball }}" --tarball-sha256 "${{ steps.pack.outputs.sha256 }}" --port 3190
+        env:
+          DSH_ROOT: ${{ github.workspace }}/../../.dsh/source/current
+          DSH_BIN: ${{ github.workspace }}/../../.dsh/source/current/apps/cli/lib/bin.js
+
+      - name: Archive synthetic Map browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: map-${{ matrix.node }}-${{ matrix.role }}
+          retention-days: 7
+          path: |
+            .e2e-artifacts/map/map-*.png
+            .e2e-artifacts/map/map-*.json
+            .e2e-artifacts/map/map-offline.html
+          if-no-files-found: ignore
+
+      - name: Archive gallery and computed browser evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -81,6 +133,9 @@ jobs:
           path: |
             gallery-*.png
             gallery-*.json
+            computed-*.png
+            computed-browser-results.json
+            computed-acceptance.json
           if-no-files-found: ignore
 
       # Only bounded synthetic screenshots and explicit verdicts, never HOME/logs/config.
@@ -131,12 +186,38 @@ jobs:
       - name: Check real browser newline layout and selection
         run: node scripts/check-text-newlines-browser.mjs
 
+      - name: Check host content font size in real browser
+        run: node scripts/check-content-font-size-browser.mjs
+
+      - name: Check optional table wrapping in real browser
+        run: node scripts/check-table-wrap-browser.mjs
+
+      - name: Check semantic block contrast in real browser
+        run: node scripts/check-blocks-theme-browser.mjs
+        env:
+          BROWSER_BIN: google-chrome
+
+      - name: Check native interaction state in real browser
+        run: node scripts/check-interaction-state-browser.mjs
+        env:
+          BROWSER_BIN: google-chrome
+
+      - name: Check step marker line height in real browser
+        run: node scripts/check-steps-marker-browser.mjs
+        env:
+          BROWSER_BIN: google-chrome
+
       - name: Archive newline browser evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: text-newlines-browser
-          path: .e2e-artifacts/text-newlines/
+          path: |
+            .e2e-artifacts/text-newlines/
+            .e2e-artifacts/table-wrap/
+            .e2e-artifacts/blocks-theme/
+            .e2e-artifacts/interaction-state/
+            .e2e-artifacts/steps-marker/
           if-no-files-found: ignore
 
   windows-pack:
@@ -164,3 +245,55 @@ jobs:
 
       - name: Pack
         run: npm pack --json
+
+  published-alpha:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.7.0
+      - name: Install plugin dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check published alpha API
+        run: pnpm run check:host-api dsh-v0.2.2-alpha.2
+      - name: Install exact published alpha host
+        id: host
+        run: node scripts/prepare-published-host.mjs 0.2.2-alpha.2
+      - name: Verify and pack plugin tarball
+        id: pack
+        run: node scripts/verify-pack.mjs --keep
+      - name: Alpha packed gallery and computed acceptance
+        run: node scripts/e2e.mjs --smoke --install tarball --tarball "${{ steps.pack.outputs.tarball }}" --tarball-sha256 "${{ steps.pack.outputs.sha256 }}" --port 3190
+        env:
+          DSH_ROOT: ${{ steps.host.outputs.root }}
+          DSH_BIN: ${{ steps.host.outputs.bin }}
+          DSH_HOST_LAYOUT: registry
+          DSH_HOST_VERSION: 0.2.2-alpha.2
+      - name: Alpha packed Map browser acceptance
+        run: node scripts/e2e.mjs --smoke --map --install tarball --tarball "${{ steps.pack.outputs.tarball }}" --tarball-sha256 "${{ steps.pack.outputs.sha256 }}" --port 3190
+        env:
+          DSH_ROOT: ${{ steps.host.outputs.root }}
+          DSH_BIN: ${{ steps.host.outputs.bin }}
+          DSH_HOST_LAYOUT: registry
+          DSH_HOST_VERSION: 0.2.2-alpha.2
+      - name: Archive alpha browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: published-alpha
+          retention-days: 7
+          include-hidden-files: true
+          path: |
+            gallery-*.png
+            gallery-*.json
+            computed-*.png
+            computed-*.json
+            .e2e-artifacts/map/map-*.png
+            .e2e-artifacts/map/map-*.json
+            .e2e-artifacts/map/map-offline.html
+          if-no-files-found: ignore

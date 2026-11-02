@@ -44,6 +44,16 @@ describe('render_ui tool definition', () => {
 })
 
 describe('render_ui execute', () => {
+  it('rejects oversized SVG with its path and lengths before reporting a valid delivery', async () => {
+    const code = `<svg>${' '.repeat(GENUI_LIMITS.maxCode)}</svg>`
+    const spec = { items: [{ type: 'svg', code }] }
+    const result = String(await createValidateDshUiTool().execute({ spec }))
+    expect(result).toContain('status=invalid')
+    expect(result).toContain(`items[0].code length ${code.length} exceeds SVG limit ${GENUI_LIMITS.maxCode}`)
+    expect(result).toContain('next=fix_and_revalidate')
+    await expect(tool.execute({ spec })).rejects.toThrow('exceeds SVG limit')
+  })
+
   it('returns a render summary for a valid spec', async () => {
     const value = await tool.execute({ spec: { title: '监控面板', items: [text('a'), { type: 'stat', label: 'CPU', value: '42%' }] } })
     expect(String(value)).toContain('监控面板')
@@ -227,9 +237,8 @@ describe('validate_dsh_ui tool', () => {
     expect(value).not.toContain('next=emit_repaired_fence')
   })
 
-  it('allows opaque custom fields and correctly escaped quotes', async () => {
+  it('accepts correctly escaped quotes in supported components', async () => {
     const value = String(await vtool.execute({ spec: { items: [
-      { type: 'custom-widget', payload: { title: '私有字段' } },
       { type: 'text', content: '含有 "引号" 的正文' },
     ] } }))
     expect(value).toContain('status=valid')
@@ -307,7 +316,6 @@ describe('validate_dsh_ui tool', () => {
       { type: 'echart', option: { type: 'text', content: '```data```' } },
       { type: 'text', content: 'foo | bar' },
       { type: 'text', content: 'A | B\n普通第二行' },
-      { type: 'custom-widget', content: '```opaque```' },
     ] } }))
     expect(value).toContain('status=valid')
     expect(value).toContain('next=emit_fence')

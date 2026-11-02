@@ -59,8 +59,10 @@ import type { ChatNode, ChatSnapshot } from '@deepseek-ai/dsh-client-ui-chat/cli
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import { GenuiActionContext, type GenuiActionHandler } from './action-context.ts'
 import { withFileLinkContext, type FileLinkAvailability, type FileLinkCordisContext } from './file-link-context.tsx'
-import css from './GenuiBlock.module.css'
 import { renderSvgFence } from './svg-fence.tsx'
+import { inferSkeleton } from './streaming-shape.ts'
+import { flushSync } from 'react-dom'
+import { GenuiSkeleton } from './blocks/skeleton.tsx'
 import { repairFenceJson, trimToBalancedRoot } from '../shared/fence-repair.ts'
 import { describeFenceFailure, FenceDiagnostic, renderResolvedFenceNode, type GenuiFenceContext } from './fence-render.tsx'
 import { resolveViewedSessionId } from './session-resolver.ts'
@@ -111,6 +113,80 @@ const PROCESSED = 'data-genui-rendered'
 /** The settled marker on AssistantMarkdown (absent = settled). */
 const STREAMING = '[data-streaming]'
 /** Container class for the plugin-owned root. */
+function prefersReducedMotion(): boolean {
+return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+/** How long the skeleton leaves and the component arrives. Short enough to
+ *  read as one motion, long enough to be seen. */
+const SWAP_MS = 220
+
+/**
+ * Swap the skeleton for real content as ONE local motion.
+ *
+ * A document-level View Transition was tried first and was wrong: it snapshots
+ * the whole page, so everything around the block (the prose below it, in the
+ * reported case) cross-faded too and appeared twice mid-flight. The transition
+ * must be contained to the block that changed.
+ *
+ * So: keep the outgoing skeleton as an absolutely-positioned layer, render the
+ * new content underneath it, animate the container's height from the old to the
+ * new one, and cross-fade the layers. The reader sees one object resolving, and
+ * the layout below slides instead of jumping.
+ */
+export function swapWithTransition(container: HTMLElement, render: () => void): void {
+const outgoing = container.firstElementChild
+if (prefersReducedMotion() || outgoing === null || typeof outgoing.animate !== 'function') {
+  render()
+  return
+}
+const before = container.getBoundingClientRect().height
+const ghost = outgoing.cloneNode(true) as HTMLElement
+ghost.setAttribute('aria-hidden', 'true')
+ghost.style.position = 'absolute'
+ghost.style.inset = '0 0 auto 0'
+ghost.style.pointerEvents = 'none'
+ghost.style.zIndex = '1'
+container.style.position = 'relative'
+container.append(ghost)
+
+flushSync(render)
+
+const after = container.getBoundingClientRect().height
+const incoming = container.firstElementChild as HTMLElement | null
+const easing = 'cubic-bezier(0.22, 0.8, 0.24, 1)'
+
+if (Number.isFinite(before) && Number.isFinite(after) && Math.abs(after - before) > 1) {
+  // The height change is what the layout below notices; animate it explicitly
+  // instead of letting it snap a frame after the fade started.
+  container.style.height = `${before}px`
+  container.style.overflow = 'hidden'
+  void container.offsetHeight
+  container.style.transition = `height ${SWAP_MS}ms ${easing}`
+  container.style.height = `${after}px`
+}
+
+ghost.animate([{ opacity: 1 }, { opacity: 0 }], { duration: SWAP_MS, easing: 'ease-out', fill: 'forwards' })
+incoming?.animate([{ opacity: 0 }, { opacity: 1 }], { duration: SWAP_MS, easing: 'ease-out', fill: 'both' })
+
+const done = (): void => {
+  ghost.remove()
+  container.style.removeProperty('height')
+  container.style.removeProperty('overflow')
+  container.style.removeProperty('transition')
+  container.style.removeProperty('position')
+}
+if (typeof ghost.animate === 'function') {
+  Promise.all([
+    ghost.getAnimations().map(a => a.finished).reduce<Promise<unknown>>((all, p) => all.then(() => p), Promise.resolve()),
+  ]).then(done).catch(done)
+  setTimeout(done, SWAP_MS + 120)
+} else {
+  done()
+}
+}
+
+
 const CONTAINER_CLASS = 'genui-dom-fence'
 /** Container class for the visible diagnostic of an unrenderable fence. */
 const DIAGNOSTIC_CLASS = 'genui-dom-fence-diagnostic'
@@ -210,20 +286,6 @@ function looksLikeGenuiInProgress(raw: string): boolean {
  *  the stock block without a mounted replacement" (issue #19) still holds: if
  *  the body never parses, the settle sweep unmounts the skeleton and the raw
  *  code block returns. */
-function GenuiSkeleton() {
-  return (
-    <div className={css.skeleton} role="status" aria-label="正在生成界面">
-      <span className={css.skeletonTitle} />
-      <span className={css.skeletonBars}>
-        <span style={{ width: '32%' }} />
-        <span style={{ width: '52%' }} />
-        <span style={{ width: '24%' }} />
-      </span>
-      <span className={css.skeletonBlock} />
-    </div>
-  )
-}
-
 interface Mount {
   root: Root
   container: HTMLElement
@@ -1188,9 +1250,14 @@ export function installDomFenceRenderer(
         }
         return
       }
-      // Streaming, spec-shaped, nothing renderable yet: show the skeleton
-      // rather than a wall of half-written JSON.
-      payload = <GenuiSkeleton />
+      // Streaming, spec-shaped, nothing renderable yet. If the first component
+      // type is already readable, show a placeholder shaped like it; otherwise
+      // show NOTHING and keep the stock code block: a shape we cannot infer is a
+      // guess, and a guess that gets replaced one frame later is worse than the
+      // raw body it covers.
+      const next = inferSkeleton(raw)
+      if (next.shape === 'generic') return
+      payload = <GenuiSkeleton {...next} />
     }
     clearDiagnostic(block)
     // Mount FIRST, hide AFTER (issue #19): the stock block is only ever
@@ -1597,7 +1664,11 @@ export function installDomFenceRenderer(
         } else {
           try {
             const handler: GenuiActionHandler = (action, payload) => sendActionForBlock(block, action, payload)
-            mount.root.render(wrapFenceNode(node, context, handler, !settled))
+            const render = (): void => { mount.root.render(wrapFenceNode(node, context, handler, !settled)) }
+            // The skeleton leaving is the moment the reader notices: cross-fade
+            // it into the component instead of cutting.
+            if (mount.skeleton) swapWithTransition(mount.container, render)
+            else render()
           } catch (error) {
             // Never leave the stock block hidden behind a broken root: restore
             // the raw code block and drop the mount (issue #19).

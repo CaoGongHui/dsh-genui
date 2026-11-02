@@ -20,6 +20,7 @@ export function ImageNode({ node }: { node: GenuiImage }): ReactNode {
             alt={node.alt ?? t('block.image')}
             loading="lazy"
             decoding="async"
+            referrerPolicy="no-referrer"
             style={{ maxHeight: 'min(70vh, 720px)', objectFit: 'contain' }}
             onError={() => setFailed(true)}
           />}

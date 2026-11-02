@@ -5,7 +5,7 @@ import { GenuiBlock } from '../src/client/GenuiBlock.tsx'
 import { GenuiActionContext } from '../src/client/action-context.ts'
 import { repairGenuiSpec } from '../src/client/guard.ts'
 import { renderInline } from '../src/client/inline.ts'
-import { tableToCsv, tableToMarkdown } from '../src/client/blocks/charts.tsx'
+import { tableToCsv, tableToMarkdown } from '../src/client/table-export.ts'
 
 const { writeClipboard } = vi.hoisted(() => ({ writeClipboard: vi.fn(async () => true) }))
 vi.mock('../src/client/primitive-adapter.ts', async importOriginal => ({

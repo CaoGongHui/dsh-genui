@@ -8,7 +8,7 @@
 </p>
 
 [![npm version](https://img.shields.io/npm/v/@changfenhuang/dsh-genui.svg?style=flat-square&color=3B82F6)](https://www.npmjs.com/package/@changfenhuang/dsh-genui)
-[![DSH Compatibility](https://img.shields.io/badge/DSH-^0.2.0--rc.1%20||%20^0.2.1--rc.1-10B981?style=flat-square)](https://github.com/omdsh-dev/dsh-genui)
+[![DSH Compatibility](https://img.shields.io/badge/DSH-^0.2.0--rc.1%20||%20^0.2.1--rc.1%20||%20^0.2.2--alpha.2-10B981?style=flat-square)](https://github.com/omdsh-dev/dsh-genui)
 [![License: MIT](https://img.shields.io/badge/License-MIT-amber.svg?style=flat-square)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Topic: dsh-plugin](https://img.shields.io/badge/ecosystem-dsh--plugin-purple?style=flat-square)](https://github.com/topics/dsh-plugin)
@@ -78,7 +78,7 @@ https://github.com/user-attachments/assets/f5db33ec-7471-4d4a-a85b-79c9962ab4ef
 ### 1. 环境准备
 
 安装前请确认满足以下条件：
-- **DSH 版本**：`^0.2.0-rc.1 || ^0.2.1-rc.1`（已在 `dsh-v0.2.0-rc.1` 与 `dsh-v0.2.1-rc.2` 上深度验证）
+- **DSH 版本**：`^0.2.0-rc.1 || ^0.2.1-rc.1 || ^0.2.2-alpha.2`。安装包浏览器验收覆盖 `0.2.0-rc.1`、`0.2.1-rc.3` 与 npm 精确安装的 `0.2.2-alpha.2`；npm `next` 的 `0.2.1-rc.4` 单独执行公开接口、完整单元测试与构建检查。alpha 宿主要求 **Node.js >=24.9.0**，图片集合、计算字段和地图使用官方本地回放验收；第三方侧栏接入在 rc.3 上验收。
 - **pnpm 处于 PATH 中**：`dsh plugin` 底层依赖 pnpm。如尚未安装，请执行 `corepack enable` 或 `npm i -g pnpm`，之后**重新打开终端**，确认 `pnpm -v` 可正常输出。
 
 ### 2. 一键安装与激活
@@ -141,6 +141,7 @@ dsh-genui 核心能力矩阵
 
 ### 2. 🎨 30+ 丰富组件生态 (Components Matrix)
 - **展示与排版**：包含指标卡（`stat`，支持 Hero 超大字号与微趋势线 Sparkline）、表格（`table`）、时间线（`timeline`）、代码对比（`diff`）、步骤条（`steps`）、文件树（`file-tree`，支持点击展开折叠）、提示卡（`callout`）、徽章（`badge`）等。
+- **内容字号**：卡片字号会随宿主「设置 → 外观 → 内容字号」增大；宿主设置为 17px 或更小时保留各组件原有字号。独立导出的 HTML 保留原有字号。
 - **高级表格**：
   - 点击表头**纯本地排序**（升序/降序/还原，支持千分位、百分比、货币及万/亿数值感知）；
   - 单元格支持 `bar` 进度条、`ring` 环形、`spark` 趋势线，带正负符号数值自动着色；
@@ -284,11 +285,15 @@ dsh plugin --profile web add link:$PWD
 ```sh
 pnpm run check           # 类型检查 + 单元测试 + 构建
 pnpm run test            # 运行 Vitest 测试套件
-pnpm run check:host-api dsh-v0.2.1-rc.2  # 检查当前发布版 DSH 的公开接口
+pnpm run check:host-api dsh-v0.2.1-rc.3  # 检查当前发布版 DSH 的公开接口
+pnpm run check:host-api dsh-v0.2.1-rc.4  # 检查 npm next；与源码宿主浏览器验收分开
+pnpm run check:host-api dsh-v0.2.2-alpha.2  # 检查受支持的 npm alpha 接口、完整测试与构建
 node scripts/verify-pack.mjs --keep  # 生成并打包校验 tarball
 ```
 
 ### 端到端 E2E 验证
+
+CI 与发布任务通过 `node scripts/prepare-published-host.mjs 0.2.2-alpha.2` 从 npm 安装精确版本，在独立 web profile 中验收插件安装包。此通道使用 `DSH_HOST_LAYOUT=registry`、`DSH_HOST_VERSION=0.2.2-alpha.2` 和脚本返回的 `DSH_ROOT`、`DSH_BIN`；源码宿主通道继续固定到对应官方标签。alpha 的接口、图片集合与计算字段、Linux 地图检查全部通过后才发布 npm。
 
 - **视觉回归 E2E（无需模型 API Key）**：
   ```sh
@@ -296,7 +301,7 @@ node scripts/verify-pack.mjs --keep  # 生成并打包校验 tarball
   ```
 - **真机闭环 E2E（调用模型真实响应）**：
   ```sh
-  export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.2
+  export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.3
   export DSH_BIN="$DSH_ROOT/apps/cli/lib/bin.js"
   DEEPSEEK_API_KEY=sk-... node scripts/e2e.mjs
   ```
@@ -315,11 +320,15 @@ node scripts/verify-pack.mjs --keep  # 生成并打包校验 tarball
 
 ---
 
+### dsh-go 接入
+
+dsh-go 适配使用 App 已有的原生卡片、正文选择与确认、插件面板，无需修改或重新安装 App。网页版继续读取完整的 GenUI 规格；原生面板支持选择、开关、按钮、提交、本地判卷、页签、折叠、复制和受控链接。正文围栏由验证工具生成网页与原生共用的 JSON。面板交互目前需要本机引擎提供 dsh-go 桥接；SSH、中转仍可显示原生工具卡。高级图形和自由输入等缺口会明确提示。详见[接入能力与验证范围](docs/dsh-go.md)。
+
 ### Sidechat surface 接入（可选）
 
 GenUI 可在 provider 明确提供的 sidechat surface 上渲染已结算的 `dsh-ui` 围栏。BetterSidebar 使用现有的 `registerSidechatSurfaceAdapter` 能力；其他 provider 可提供可选的 `genuiSidechat` Cordis service。每个 surface 都携带所属线程身份和专属 prompt 回调，因此动作与交互状态留在对应子线程。流式内容及不支持或无效的围栏保留原 Markdown。
 
-请参阅 [sidechat surface adapter 接口说明](docs/sidechat-surfaces.md)。启用 DSH 原生 Side Chat 接入需要其 provider 提供 `genuiSidechat`。
+请参阅 [sidechat surface adapter 接口说明](docs/sidechat-surfaces.md)。BetterSidebar 侧边对话渲染需要包含[配套 provider 实现](https://github.com/omdsh-dev/DSH-better-sidebar/pull/1033)的发布版本；已发布的 0.28.0 尚未提供 `registerSidechatSurfaceAdapter`。启用 DSH 原生 Side Chat 接入需要其 provider 提供 `genuiSidechat`。
 
 ## ❓ 常见问题排查 (FAQ)
 
@@ -357,7 +366,7 @@ dsh plugin --profile web add @changfenhuang/dsh-genui
 <details>
 <summary><strong>Q: 渲染 dsh-ui 时界面出现白屏？</strong></summary>
 
-当前版本强依赖 DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`。如运行在较老版本的 DSH 上可能存在 React 上下文兼容问题，请升级 DSH 宿主。
+当前版本要求 DSH `^0.2.0-rc.1 || ^0.2.1-rc.1 || ^0.2.2-alpha.2`。如运行在较老版本的 DSH 上可能存在 React 上下文兼容问题，请升级 DSH 宿主。
 </details>
 
 ---
@@ -383,3 +392,10 @@ dsh plugin --profile web add @changfenhuang/dsh-genui
 ## 📄 开源许可
 
 本项目遵循 [MIT License](LICENSE) 开源协议。
+
+### 交互式地图
+
+`map` 使用延迟加载的 MapLibre 标记和内联路线，并始终提供可键盘操作的地点列表。
+地点选择只在本地更新，可通过既有字段机制持久化并由独立提交按钮发送地点 ID。
+默认是无街道底图的离线坐标地图；外部样式仅由可信宿主配置，不接受模型 JSON URL。
+详见 [地图契约与嵌入、导出说明](docs/map.md)。

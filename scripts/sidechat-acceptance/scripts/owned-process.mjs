@@ -1,12 +1,14 @@
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
 export const delay = ms => new Promise(resolve => setTimeout(resolve, ms))
+/** 在指定时限内等待操作完成，超时则报告对应步骤。 */
 export async function timeout(operation, ms, label) {
   let timer
   try { return await Promise.race([Promise.resolve().then(operation), new Promise((_, reject) => { timer = setTimeout(() => reject(new Error(`${label} timed out`)), ms) })]) }
   finally { clearTimeout(timer) }
 }
-/** Captures launch token only in bounded process memory; never writes raw logs. */
+/** 仅在受限进程内存中读取启动令牌，不写入原始日志。 */
+/** 启动并管理验收脚本创建的子进程。 */
 export function spawnOwned(command, args, { cwd, env, label, expectedStopCode = 0, rejectBlockedBuilds = false }) {
   const child = spawn(command, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: false })
   let output = '', launchUrl, closed, failure, stopping = false, completedCommand = false, blockedBuild = false
@@ -21,8 +23,11 @@ export function spawnOwned(command, args, { cwd, env, label, expectedStopCode = 
   child.stdout.on('data', receive); child.stderr.on('data', receive)
   child.on('error', error => { failure = new Error(`${label} failed to spawn (${error.code ?? 'unknown'})`) })
   child.on('close', (code, signal) => { closed = { code, signal }; resolveClosed(closed) })
-  const diagnostic = () => output.split('\n').filter(line => /error|cannot|not found|unknown|invalid|requires|ENOENT|ERR_/iu.test(line)).slice(-5).map(line => line.replace(/https?:\/\/[^\s]+/gu, '[URL withheld]').replace(/token[^\s]*/giu, '[token withheld]')).join(' | ').slice(0, 1800)
+  /** 收集并清理最近的错误行，供进程失败信息使用。 */
+  const diagnostic = () => output.split('\n').filter(line => /error|fatal|failed|unable|could not|cannot|not found|unknown|invalid|requires|ENOENT|ERR_/iu.test(line)).slice(-5).map(line => line.replace(/https?:\/\/[^\s]+/gu, '[URL withheld]').replace(/token[^\s]*/giu, '[token withheld]')).join(' | ').slice(0, 1800)
+  /** 确认进程仍在运行，提早报告启动错误或异常退出。 */
   const alive = () => { if (failure) throw failure; if (closed !== undefined) throw new Error(`${label} exited before completion (${closed.code ?? closed.signal}); ${diagnostic()}`) }
+  /** 结束本次验收启动的进程并核对退出状态。 */
   async function stop() {
     if (stopping) return closedPromise
     stopping = true
@@ -50,7 +55,7 @@ export function spawnOwned(command, args, { cwd, env, label, expectedStopCode = 
   }, async finish(timeoutMs = 120000) {
     const result = await timeout(() => closedPromise, timeoutMs, label)
     if (failure) throw failure
-    assert.equal(result.code, 0, `${label} failed (${result.code}); no script approval or policy bypass will be attempted`)
+    assert.equal(result.code, 0, `${label} failed (${result.code}); ${diagnostic()}; no script approval or policy bypass will be attempted`)
     assert.equal(blockedBuild, false, `${label} requires dependency-build approval; skipped scripts cannot count as acceptance`)
     completedCommand = true; output = ''; return result
   } }

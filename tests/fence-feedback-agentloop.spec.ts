@@ -72,6 +72,10 @@ describe('真实 AgentLoop：reasoning-only 后的提醒与重试恢复', () => 
     for (const plugin of [SessionProjectionRegistry, SessionStore, AgentRegistry, SystemPrompt, ToolRuntime, LlmRuntime]) {
       await ctx.plugin(plugin)
     }
+    if ('setExecutor' in ctx.tools) {
+      const module = '@deepseek-ai/dsh-tool-executor-native'
+      await ctx.plugin(await import(/* @vite-ignore */ module))
+    }
     applyGenui(ctx, {})
     // 工具注册走 inject fiber，给它一轮微任务落地。
     await new Promise(resolve => setTimeout(resolve, 100))

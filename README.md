@@ -8,7 +8,7 @@
 </p>
 
 [![npm version](https://img.shields.io/npm/v/@changfenhuang/dsh-genui.svg?style=flat-square&color=3B82F6)](https://www.npmjs.com/package/@changfenhuang/dsh-genui)
-[![DSH Compatibility](https://img.shields.io/badge/DSH-^0.2.0--rc.1%20||%20^0.2.1--rc.1-10B981?style=flat-square)](https://github.com/omdsh-dev/dsh-genui)
+[![DSH Compatibility](https://img.shields.io/badge/DSH-^0.2.0--rc.1%20||%20^0.2.1--rc.1%20||%20^0.2.2--alpha.2-10B981?style=flat-square)](https://github.com/omdsh-dev/dsh-genui)
 [![License: MIT](https://img.shields.io/badge/License-MIT-amber.svg?style=flat-square)](LICENSE)
 [![TypeScript](https://img.shields.io/badge/TypeScript-Ready-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
 [![Topic: dsh-plugin](https://img.shields.io/badge/ecosystem-dsh--plugin-purple?style=flat-square)](https://github.com/topics/dsh-plugin)
@@ -78,7 +78,7 @@ https://github.com/user-attachments/assets/f5db33ec-7471-4d4a-a85b-79c9962ab4ef
 ### 1. Prerequisites
 
 Ensure your environment meets the following requirements:
-- **DSH Version**: `^0.2.0-rc.1 || ^0.2.1-rc.1` (verified against `dsh-v0.2.0-rc.1` and `dsh-v0.2.1-rc.2`)
+- **DSH Version**: `^0.2.0-rc.1 || ^0.2.1-rc.1 || ^0.2.2-alpha.2`. Packed browser acceptance covers `0.2.0-rc.1`, `0.2.1-rc.3` and the exact npm host `0.2.2-alpha.2`; npm `next` version `0.2.1-rc.4` has separate public-API, full-unit-suite and build checks. The alpha host requires **Node.js >=24.9.0**. Its gallery, computed-field and Map acceptance uses official local replay; third-party sidebar integration is checked on rc.3.
 - **pnpm on PATH**: The `dsh plugin` CLI requires pnpm. If missing: run `corepack enable` or `npm i -g pnpm`, then **open a new terminal** and confirm `pnpm -v` prints a version number.
 
 ### 2. Install & Activate
@@ -141,6 +141,7 @@ dsh-genui Capabilities
 
 ### 2. 🎨 30+ Component Ecosystem
 - **Display & Typography**: Hero banner, Stat cards (`stat` with eyebrow labels, deltas, and sparklines), Tables, Timelines, Code Diffs, Step progress, File trees (interactive expand/collapse), Callouts, and Badges.
+- **Content Font Size**: Card typography grows with the host's Appearance → Content Font Size setting above 17px. At 17px or below, each component keeps its existing size. Standalone HTML exports keep their existing sizes.
 - **Advanced Tables**:
   - Click headers to **sort locally** (ascending / descending / reset) with smart parsing for numbers, currency, commas, percentages, and `k/m/b` units;
   - Columns support inline progress bars (`bar`), rings (`ring`), sparklines (`spark`), and badges;
@@ -285,11 +286,15 @@ dsh plugin --profile web add link:$PWD
 ```sh
 pnpm run check           # Type checks + full unit test suite + build
 pnpm run test            # Run Vitest unit tests
-pnpm run check:host-api dsh-v0.2.1-rc.2  # Check the current published DSH API
+pnpm run check:host-api dsh-v0.2.1-rc.3  # Check the current published DSH API
+pnpm run check:host-api dsh-v0.2.1-rc.4  # Check npm next; separate from source-host browser acceptance
+pnpm run check:host-api dsh-v0.2.2-alpha.2  # Check the supported npm alpha API, full suite and build
 node scripts/verify-pack.mjs --keep  # Verify and inspect npm tarball
 ```
 
 ### End-to-End (E2E) Testing
+
+CI and the release workflow install `0.2.2-alpha.2` from npm with `node scripts/prepare-published-host.mjs 0.2.2-alpha.2`, then verify the packed plugin in a fresh web profile. This lane uses `DSH_HOST_LAYOUT=registry` and `DSH_HOST_VERSION=0.2.2-alpha.2` with the returned `DSH_ROOT` and `DSH_BIN`; the source-host lanes remain pinned to their official tags. The alpha API, gallery/computed and Linux Map checks must pass before npm publication.
 
 - **Visual E2E Smoke (No Model API Key Required)**:
   ```sh
@@ -297,7 +302,7 @@ node scripts/verify-pack.mjs --keep  # Verify and inspect npm tarball
   ```
 - **Real-Model Integration E2E**:
   ```sh
-  export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.2
+  export DSH_ROOT=/path/to/deepseek-harness-0.2.1-rc.3
   export DSH_BIN="$DSH_ROOT/apps/cli/lib/bin.js"
   DEEPSEEK_API_KEY=sk-... node scripts/e2e.mjs
   ```
@@ -318,13 +323,38 @@ To customize plugin behaviors, add configurations under `cordis.patch.yml` in yo
 
 You can import `GenuiBlock`, `GenuiActionContext`, and `processGenuiSpec` from `@changfenhuang/dsh-genui/embed` to embed the renderer into any React application supporting CSS Modules.
 
+### dsh-go integration
+
+The dsh-go integration uses the App’s existing native cards, inline choices and plugin panels; no App patch or replacement APK is needed. The complete web spec stays authoritative. Native panels support choices, switches, buttons, submissions, local grading, tabs, accordions, copy and confirmed HTTPS links. Validation can produce one JSON fence readable by both renderers. Panels currently require the local-engine dsh-go bridge; SSH and relay hosts retain native tool cards. Advanced graphics and free-text input remain explicit limitations. See [capabilities and verification](docs/dsh-go.md).
+
+### Theming: non-opaque host canvases
+
+Every surface resolves through one chain: `--dsl-g-surface` → `--dsh-genui-surface` → `--dsw-alias-bg-layer-2` → … → `#fff`. A skin that paints the page itself (wallpaper, glass / translucent look) can pin the surface once without touching the host's own tokens:
+
+```css
+:root { --dsh-genui-surface: rgba(255, 255, 255, 0.58); }
+body[data-ds-dark-theme] { --dsh-genui-surface: rgba(32, 32, 34, 0.54); }
+```
+
+`callout` and toned `card` washes are painted *over* that surface, so they stay readable on any canvas. `card.flat` and `table` are surface-less by design (a printed block, a bare data grid) and would show a non-opaque page through — they fill only when a skin asks for it:
+
+```css
+:root {
+  --dsh-genui-surface: rgba(255, 255, 255, 0.58);      /* cards, callouts, controls */
+  --dsh-genui-surface-flat: var(--dsh-genui-surface);  /* card.flat */
+  --dsh-genui-surface-table: var(--dsh-genui-surface); /* table */
+}
+```
+
+Leaving the last two unset keeps today's look (transparent table, 2.5% printed flat card); pointing them at `var(--dsh-genui-surface)` gives all three one fill. Wrapping a table in a `card` fills it too, since the parent surface shows through (issue #398).
+
 ---
 
 ### Sidechat surfaces (optional)
 
 GenUI can render settled `dsh-ui` fences on provider-declared sidechat surfaces. BetterSidebar uses its `registerSidechatSurfaceAdapter` capability; other providers can expose the optional `genuiSidechat` Cordis service. Each surface carries its owning thread identity and prompt callback, so actions and interaction state stay within that child thread. Streaming rows and unsupported or invalid fences keep their original Markdown.
 
-See [the sidechat surface adapter contract](docs/sidechat-surfaces.md). The DSH native Side Chat provider must expose `genuiSidechat` to enable this integration.
+See [the sidechat surface adapter contract](docs/sidechat-surfaces.md). BetterSidebar support requires a release containing [its provider implementation](https://github.com/omdsh-dev/DSH-better-sidebar/pull/1033); the released 0.28.0 does not expose `registerSidechatSurfaceAdapter`. The DSH native Side Chat provider must expose `genuiSidechat` to enable this integration.
 
 ## ❓ FAQ & Troubleshooting
 
@@ -362,7 +392,7 @@ dsh plugin --profile web add @changfenhuang/dsh-genui
 <details>
 <summary><strong>Q: The chat screen goes blank when rendering a fence?</strong></summary>
 
-This version strictly requires DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`. Older host versions lack necessary React slot/context capabilities; please upgrade DSH.
+This version requires DSH `^0.2.0-rc.1 || ^0.2.1-rc.1 || ^0.2.2-alpha.2`. Older host versions lack necessary React slot/context capabilities; please upgrade DSH.
 </details>
 
 ---
@@ -388,3 +418,12 @@ This version strictly requires DSH `^0.2.0-rc.1 || ^0.2.1-rc.1`. Older host vers
 ## 📄 License
 
 This project is licensed under the [MIT License](LICENSE).
+
+### Interactive maps
+
+The `map` node combines lazy MapLibre markers and inline routes with an
+always-available keyboard-operable location list. Selection stays local and can
+be persisted/submitted as a stable location ID through the existing fields
+contract. The default is an offline blank coordinate map, not a street basemap;
+external styles belong to trusted host configuration, never model JSON.
+See [the map contract and embedding/export guide](docs/map.md).

@@ -12,8 +12,8 @@ import { projectSnapshotFailure } from './fixture/lib/snapshot-diagnostics.mjs'
 import { projectOnboardingReport } from './scripts/sidechat-onboarding.mjs'
 import { HOST_VERSION, isChildPath, sidechatSmokeEnvironment, verifyTarball, withOwnedResources } from './scripts/sidechat-host-contract.mjs'
 
-export const SIDEBAR_REPOSITORY = 'https://github.com/sunxiuguo/DSH-better-sidebar.git'
-export const SIDEBAR_COMMIT = '34fbad8a75ca4e80af0375800378bcf7c4119d1d'
+export const SIDEBAR_REPOSITORY = 'https://github.com/omdsh-dev/DSH-better-sidebar.git'
+export const SIDEBAR_COMMIT = 'cd1251be2d61a75aac0fa2054fc09cdee8f62f08'
 const MINIMUM_HOST_VERSION = '0.2.0-rc.1'
 const VERDICT = 'dsh354-host-verdict.json'
 
@@ -60,14 +60,14 @@ export async function buildPinnedSidebar(root, { executeCommand = execute, own, 
   assert.equal((await readFile(join(checkout, '.git/HEAD'), 'utf8')).trim(), SIDEBAR_COMMIT, 'Sidebar checkout must match the reviewed commit')
   const pkg = JSON.parse(await readFile(join(checkout, 'package.json'), 'utf8'))
   assert.equal(pkg.name, 'dsh-better-sidebar')
-  assert.equal(pkg.version, '0.28.0')
+  assert.equal(pkg.version, '0.29.0')
   assert.equal(pkg.packageManager, 'pnpm@11.8.0', 'Use the pinned repository package manager without overrides')
   await run('pnpm', ['install', '--frozen-lockfile'])
   await run('pnpm', ['run', 'typecheck'])
   await run('pnpm', ['run', 'build'])
   await run('pnpm', ['pack', '--pack-destination', packs])
   const files = await readdir(packs)
-  assert.deepEqual(files, ['dsh-better-sidebar-0.28.0.tgz'], 'Exactly one fresh, expected Sidebar pack required')
+  assert.deepEqual(files, ['dsh-better-sidebar-0.29.0.tgz'], 'Exactly one fresh, expected Sidebar pack required')
   const sidebarTarball = join(packs, files[0])
   assert.ok(isChildPath(await realpath(packs), await realpath(sidebarTarball)), 'Sidebar pack must stay in the owned output directory')
   const packed = await inspectPack(sidebarTarball, pkg.name)
@@ -101,7 +101,7 @@ export async function runSidechatCI(options, { executeCommand = execute, accepta
     const applicability = hostApplicability(version)
     if (applicability === 'not-applicable') {
       report.status = 'not-applicable'
-      report.reason = 'The minimum 0.2.0-rc.1 lane runs the existing GenUI smoke; dual-plugin coverage requires exact 0.2.1-rc.2.'
+      report.reason = 'The minimum 0.2.0-rc.1 lane runs the existing GenUI smoke; dual-plugin coverage requires exact 0.2.1-rc.3.'
       return report
     }
     stage = 'genui-pack-preflight'

@@ -8,13 +8,45 @@
  * v1 interactivity is client-side only: buttons, tabs, checkboxes, and inputs
  * are operable, but events do NOT flow back to the model.
  */
-import { COMPONENT_SCHEMAS, GENUI_NATIVE_TYPES } from './genui-runtime/schema.ts'
+import { COMPONENT_SCHEMAS, GENUI_NATIVE_TYPES, POPOVER_PLACEMENTS, WHEN_OPS } from './genui-runtime/schema.ts'
 
 /** One node in the component tree. */
 /** Layout hints accepted by every node: `span` is how many columns the node
  *  occupies as a direct child of a `grid` (bento layouts). */
+/** Comparison operators a `when` condition can use. */
+export type GenuiWhenOp = typeof WHEN_OPS[number]
+
+/**
+ * 根据区块自身保存的字段值控制节点显示：输入类组件、地图和图解使用 `id`，
+ * `radio`、`checkbox` 和 `choices` 使用 `group`。例如选择“公司”后，
+ * 可以立即显示税号输入框。
+ *
+ * Hidden nodes are not rendered, and their values are excluded from the sibling
+ * `submit` payload — a hidden field must never submit a stale value the reader
+ * cannot see.
+ */
+export interface GenuiWhen {
+  /** 要读取的字段 ID 或答案组名。 */
+  field: string
+  op: GenuiWhenOp
+  /** Comparison target: a scalar for eq/neq/gt/…, a list for in/not-in. */
+  value?: string | number | boolean | (string | number)[]
+}
+
 export interface GenuiLayoutHints {
   span?: number
+  /** Render this node only while the condition holds (see {@link GenuiWhen}). */
+  when?: GenuiWhen
+  /**
+   * Render this node, but disabled, unless the condition holds. Different from
+   * `when`: the reader still SEES the control (so the form's shape is stable and
+   * the requirement is discoverable) and `disabledReason` explains what unlocks
+   * it. Use `when` for a branch that does not apply at all, `enableWhen` for a
+   * step that applies but is not yet reachable.
+   */
+  enableWhen?: GenuiWhen
+  /** One line shown with a disabled node: what unlocks it. */
+  disabledReason?: string
 }
 
 export type GenuiNode = (
@@ -26,10 +58,14 @@ export type GenuiNode = (
   | GenuiButton
   | GenuiInput
   | GenuiSelect
+  | GenuiDatePicker
+  | GenuiSegmentedControl
   | GenuiCheckbox
   | GenuiLink
   | GenuiImage
   | GenuiImageGroup
+  | GenuiCompare
+  | GenuiChoices
   | GenuiCarousel
   | GenuiAudio
   | GenuiVideo
@@ -61,6 +97,7 @@ export type GenuiNode = (
   | GenuiMermaid
   | GenuiSvg
   | GenuiScene3D
+  | GenuiMap
   | GenuiTimeline
   | GenuiFileTree
   | GenuiBreadcrumb
@@ -69,9 +106,38 @@ export type GenuiNode = (
   | GenuiIcon
   | GenuiBlocks
   | GenuiArrow
+  | GenuiEditor
+  | GenuiEntityCard
+  | GenuiPopover
 ) & GenuiLayoutHints
 
-  | GenuiEChart
+  | (GenuiEChart & GenuiLayoutHints)
+
+/** A map is a local location picker, never an implicit action or geocoder. */
+export interface GenuiMapLocation {
+  id: string
+  label: string
+  coordinates: [number, number]
+  description?: string
+}
+export interface GenuiMapRoute {
+  id: string
+  label: string
+  /** Inline LineString, not a routing-service request. */
+  coordinates: [number, number][]
+}
+export interface GenuiMap {
+  type: 'map'
+  title?: string
+  /** Submission field holding a selected location ID, not a label. */
+  id?: string
+  locations: GenuiMapLocation[]
+  routes?: GenuiMapRoute[]
+  selected?: string
+  center?: [number, number]
+  zoom?: number
+  height?: number
+}
 
 export interface GenuiSpec {
   /** Short title shown as the card banner. */
@@ -140,6 +206,49 @@ export interface GenuiText {
   align?: 'left' | 'center' | 'right'
 }
 
+/** Editable plain-text content whose draft is stored with the containing block. */
+export interface GenuiEditor {
+  type: 'editor'
+  id: string
+  value: string
+  label?: string
+  placeholder?: string
+  rows?: number
+}
+
+export interface GenuiEntityMetadata {
+  label: string
+  value: string
+}
+
+export interface GenuiEntityAction {
+  label: string
+  action: string
+  tone?: 'primary' | 'danger' | 'success' | 'ghost'
+}
+
+/** A compact summary for a person, product, place, or organization. */
+export interface GenuiEntityCard {
+  type: 'entity-card'
+  name: string
+  image?: string
+  imageAlt?: string
+  description?: string
+  metadata?: GenuiEntityMetadata[]
+  href?: string
+  sourceLabel?: string
+  actions?: GenuiEntityAction[]
+}
+
+/** A keyboard-operable floating explanation attached to a labelled trigger. */
+export interface GenuiPopover {
+  type: 'popover'
+  label: string
+  content: string
+  trigger?: 'click' | 'hover'
+  placement?: typeof POPOVER_PLACEMENTS[number]
+}
+
 export interface GenuiButton {
   type: 'button'
   label: string
@@ -185,7 +294,34 @@ export interface GenuiSelect {
   id?: string
 }
 
+/** 使用 ISO 日期或 ISO 日期区间的原生日期控件。 */
+export interface GenuiDatePicker {
+  type: 'date-picker'
+  label?: string
+  mode?: 'single' | 'range'
+  /** 单日期使用 ISO 日期；范围模式使用 `start/end` 两个 ISO 日期。 */
+  value?: string
+  min?: string
+  max?: string
+  /** 供共享状态和 submit 使用的字段标识。 */
+  id?: string
+}
+
+/** 可通过共享选中值更新同级组件的单选控件。 */
+export interface GenuiSegmentedControl {
+  type: 'segmented-control'
+  label?: string
+  options: string[]
+  value?: string
+  id?: string
+  action?: string
+}
+
+/** 保存计算后复选框显示文案对应的运行时身份。 */
+export const GENUI_CHECKBOX_VALUE = Symbol('dsh-genui-checkbox-value')
+
 export interface GenuiCheckbox {
+  [GENUI_CHECKBOX_VALUE]?: string
   type: 'checkbox'
   label: string
   checked?: boolean
@@ -231,6 +367,87 @@ export interface GenuiImageGroup {
   type: 'image-group'
   items: GenuiImageGroupItem[]
   title?: string
+}
+
+/** One side of a `compare` pair. Same media policy as `image`. */
+export interface GenuiComparePanel {
+  /** http(s) or relative media URL. */
+  src: string
+  /** Visible chip above the frame — `改动前` / `改动后`, or any two labels. */
+  label?: string
+  /** Accessible description (never shown as a heading). */
+  alt?: string
+  /** Line under the frame (measurement, reading, source). */
+  caption?: string
+}
+
+/** One row in a `choices` decision list. */
+export interface GenuiChoiceItem {
+  /** What the option IS (`加一台只读副本`). */
+  label: string
+  /** One line of cost / trade-off (`多 12% 成本，读延迟降 40%`). */
+  hint?: string
+  /** Short evidence chip on the right: a number, a verdict, a SLO. */
+  meta?: string
+  /** Marks the option the analyst recommends (at most one is expected). */
+  recommended?: boolean
+  /** Rules the option out without hiding it — the reason stays visible. */
+  disabled?: boolean
+  /** Why it is unavailable; shown in place of the hint when disabled. */
+  reason?: string
+}
+
+/**
+ * A decision the reader has to MAKE, not read: pick one (or several) from a
+ * list where every option carries its own cost. Distinct from `radio`, whose
+ * options are single strings with nowhere to put a trade-off.
+ *
+ * Local-first: selection is local state; `action` (optional) sends the chosen
+ * labels back to the model only when the choice needs a follow-up.
+ */
+export interface GenuiChoices {
+  type: 'choices'
+  title?: string
+  /** The question being decided (`先做哪个？`). */
+  prompt?: string
+  /** `single` (default) = one option; `multi` = toggle several. */
+  mode?: 'single' | 'multi'
+  items: GenuiChoiceItem[]
+  /** Label of the submit button; absent = selection stays local (no round trip). */
+  submit?: string
+  /** Action fired on submit with `{ question, selected, mode }`. */
+  action?: string
+  /** `multi` cap; extra clicks are ignored instead of silently replacing. */
+  max?: number
+  /**
+   * Paper member key. With `group`, the selection joins the block's shared
+   * answers registry instead of staying local, so a sibling `submit` can
+   * collect it and grade locally — this is what retires `radio`.
+   */
+  group?: string
+  /** Correct option for LOCAL grading: index or label. */
+  answer?: number | string
+  /** Per-question explanation shown after local grading. */
+  explanation?: string
+}
+
+/**
+ * Two images shown as a pair: what changed, what was chosen, what the two
+ * options look like. Not a gallery — a `before`/`after` pair carries an order,
+ * and `mode: 'slider'` lets the reader drag a divider across one frame.
+ */
+export interface GenuiCompare {
+  type: 'compare'
+  title?: string
+  before: GenuiComparePanel
+  after: GenuiComparePanel
+  /**
+   * `side` (default) = two columns while the container is wide enough,
+   * `stack` = always vertical, `slider` = one frame with a draggable divider.
+   */
+  mode?: 'side' | 'stack' | 'slider'
+  /** Frame height cap in px (120–640, default 260). */
+  height?: number
 }
 
 /** Horizontally scrollable native nodes, retaining normal state/action scope. */
@@ -483,6 +700,12 @@ export interface GenuiTable {
   filterColumn?: number
   /** Field id of a select whose value is a column header: sorts by it locally. */
   sortField?: string
+  /** Lay a long-text table out like prose instead of a data grid: the table
+   *  tracks the container width and every cell wraps, so a column of full
+   *  sentences can wrap. Columns retain a readable minimum width, so narrow
+   *  containers may still scroll. Omit (or `false`) for the data-table voice:
+   *  nowrap cells and horizontal scroll on overflow (see #326). */
+  wrap?: boolean
 }
 
 /** How a table column's cells render.
@@ -859,6 +1082,8 @@ export interface GenuiDiagramNode {
   label: string
   /** Optional technical sublabel (Geist mono in the renderer). */
   sub?: string
+  /** 选择节点后显示的说明。 */
+  description?: string
   /** Semantic treatment; `focal` is budgeted (max 2 per diagram). */
   type?: GenuiDiagramNodeType
   /** Position / size (coordinate-mode kinds only). 4px grid is enforced at render. */
@@ -919,6 +1144,8 @@ export interface GenuiDiagramZone {
  */
 export interface GenuiDiagram {
   type: 'diagram'
+  /** 保存所选节点 ID，供周边组件读取。 */
+  id?: string
   /** The 27-type editorial vocabulary. */
   kind: GenuiDiagramKind
   /** Surface skin; default follows the host theme. */
@@ -1008,15 +1235,16 @@ export function parseGenuiSpec(raw: string): GenuiSpec | null {
  * both readings are components. A whitelisted `type` therefore wins over the
  * envelope reading — `{"type":"steps","items":[{"title":"…"}]}` is a bare
  * steps node, never a spec whose `items` are the step records (issue #172).
- * A non-native `type` keeps the envelope reading, so a stray `type` field
- * (`{"type":"genui","items":[…]}`) cannot swallow a real spec root.
+ * Only the explicit `genui` document marker and the dual native `stack`
+ * envelope keep the envelope reading. Unknown component names must reach
+ * validation instead of silently rendering only their children.
  */
 export function isComponentRoot(value: unknown): boolean {
   if (typeof value !== 'object' || value === null) return false
-  const v = value as { type?: unknown; items?: unknown }
+  const v = value as { type?: unknown; items?: unknown; children?: unknown }
   if (typeof v.type !== 'string' || v.type === '') return false
   if (!Array.isArray(v.items)) return true
-  return GENUI_NATIVE_TYPES.has(v.type)
+  return v.type !== 'genui' && !(v.type === 'stack' && Array.isArray(v.children))
 }
 
 /**

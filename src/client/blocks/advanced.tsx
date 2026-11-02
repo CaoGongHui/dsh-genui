@@ -365,7 +365,7 @@ export const MermaidNode = memo(function MermaidNode({ node }: { node: GenuiMerm
       for (const entry of entries) {
         visible = entry.isIntersecting
         if (!visible && !finished) { controller?.abort(); controller = undefined }
-        if (visible) start()
+        if (visible) { onTheme(); start() }
       }
     }, { rootMargin: `${window.innerHeight}px 0px` })
     if (ref.current !== null) observer?.observe(ref.current)
@@ -382,11 +382,13 @@ export const MermaidNode = memo(function MermaidNode({ node }: { node: GenuiMerm
           String(window.matchMedia?.('(prefers-color-scheme: dark)').matches))
         .join('\n')
     }
-    let previousTheme = themeKey()
+    let previousTheme: string | undefined
     const onTheme = (): void => {
+      if (!alive || !visible) return
       const nextTheme = themeKey()
-      if (!alive || previousTheme === nextTheme) return
+      const changed = previousTheme !== undefined && previousTheme !== nextTheme
       previousTheme = nextTheme
+      if (!changed) return
       controller?.abort()
       controller = undefined
       finished = false
@@ -411,6 +413,7 @@ export const MermaidNode = memo(function MermaidNode({ node }: { node: GenuiMerm
     document.head.addEventListener('load', onTheme, true)
     const scheme = window.matchMedia?.('(prefers-color-scheme: dark)')
     scheme?.addEventListener('change', onTheme)
+    onTheme()
     start()
     return () => {
       alive = false

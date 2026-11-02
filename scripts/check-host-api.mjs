@@ -1,19 +1,35 @@
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { tmpdir } from 'node:os'
 import { fileURLToPath } from 'node:url'
+import { minVersion, satisfies } from 'semver'
+import { parse, stringify } from 'yaml'
+import { mergeExactVersionExceptions } from './host-dependency-policy.mjs'
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const hostRef = process.argv[2]
 assert.match(hostRef ?? '', /^dsh-v\d+\.\d+\.\d+(?:-(?:alpha|beta|rc)\.\d+)?$/, '需要明确的 DSH 发布标签')
 const version = hostRef.slice('dsh-v'.length)
 const pkg = JSON.parse(await readFile(join(repoRoot, 'package.json'), 'utf8'))
+const host = JSON.parse(execFileSync('pnpm', ['view', `@deepseek-ai/dsh@${version}`, '--json'], { encoding: 'utf8' }))
+assert.equal(host.name, '@deepseek-ai/dsh')
+assert.equal(host.version, version)
+assert.ok(satisfies(process.versions.node, host.engines?.node ?? '*'), 'Node must satisfy the selected host runtime')
+const core = ['@deepseek-ai/cordis', '@deepseek-ai/cordis-plugin-include', '@deepseek-ai/cordis-plugin-loader']
+  .filter(name => host.dependencies[name] !== undefined)
+  .map(name => {
+    const exact = minVersion(host.dependencies[name])
+    assert.ok(exact, `Expected a versioned host dependency: ${name}`)
+    return `${name}@${exact.version}`
+  })
+const toolExports = JSON.parse(execFileSync('pnpm', ['view', `@deepseek-ai/dsh-tools@${version}`, 'exports', '--json'], { encoding: 'utf8' }))
 const dshPackages = [...new Set([
   ...Object.keys(pkg.peerDependencies),
   ...Object.keys(pkg.devDependencies),
 ])].filter(name => name.startsWith('@deepseek-ai/dsh-'))
+if (toolExports['./pipeline'] !== undefined) dshPackages.push('@deepseek-ai/dsh-tool-executor-native')
 const checkRoot = await mkdtemp(join(tmpdir(), 'dsh-genui-host-api-'))
 
 try {
@@ -24,6 +40,10 @@ try {
   await cp(join(repoRoot, 'tests'), join(checkRoot, 'tests'), { recursive: true })
   // e2e-auth 等测试按 cwd 相对路径读取 scripts/ 源码，隔离目录需要一并拷贝
   await cp(join(repoRoot, 'scripts'), join(checkRoot, 'scripts'), { recursive: true })
+  // Map 的 CI/发布契约测试读取真实工作流；只复制需要的工作流输入。
+  await mkdir(join(checkRoot, '.github/workflows'), { recursive: true })
+  await cp(join(repoRoot, '.github/workflows/ci.yml'), join(checkRoot, '.github/workflows/ci.yml'))
+  await cp(join(repoRoot, '.github/workflows/release.yml'), join(checkRoot, '.github/workflows/release.yml'))
 
   // 所有直接 DSH 依赖统一到目标版本，避免测试辅助包把另一版宿主混入检查。
   // pnpm 在隔离目录安装发布包，源码中的 import 由该目录的 node_modules 解析。
@@ -38,9 +58,14 @@ try {
     'micromark-extension-math', 'zustand', 'immer',
   ]
   execFileSync('pnpm', ['add', '--save-dev', '--save-exact',
+    ...core,
     ...dshPackages.map(name => `${name}@${version}`),
     ...hostRuntimeClosure.map(name => `${name}@${pkg.devDependencies[name]}`),
   ], { cwd: checkRoot, stdio: 'inherit' })
+  const policyFile = join(checkRoot, 'pnpm-workspace.yaml')
+  const policy = parse(await readFile(policyFile, 'utf8'))
+  policy.minimumReleaseAgeExclude = mergeExactVersionExceptions(policy.minimumReleaseAgeExclude ?? [])
+  await writeFile(policyFile, stringify(policy))
   for (const name of dshPackages) {
     const installed = JSON.parse(await readFile(join(checkRoot, 'node_modules', name, 'package.json'), 'utf8'))
     assert.equal(installed.version, version, `${name} 必须使用 ${version} 的公开类型`)

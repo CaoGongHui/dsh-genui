@@ -3,14 +3,14 @@
  * An unrepairable body returns `null` so the stock code block stays visible,
  * with {@link FenceDiagnostic} mounted above it (issue #158).
  */
-import { Fragment, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type Key, type ReactNode } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type CSSProperties, type Key, type ReactNode } from 'react'
 import { CodeBlock } from '@deepseek-ai/dsh-client-ui-primitives'
 import { codeBlockLabels } from './primitive-labels.ts'
 import { t, useT } from './i18n/index.ts'
 import { ErrorBoundary } from './ErrorBoundary.tsx'
 import { ExportableGenuiBlock } from './artifact/ExportableGenuiBlock.tsx'
 import { fenceStateKey } from './interaction-store.ts'
-import { applyPanelOperation, diagnosePanelBudget, type PanelOperationStatus } from './panel-store.ts'
+import { applyPanelOperation, diagnosePanelBudget, getPanelOperationError, subscribePanel, type PanelOperationStatus } from './panel-store.ts'
 import type { GenuiSpec } from './spec.ts'
 import { describeJsonFailure, isCompleteJson } from '../shared/fence-repair.ts'
 import { resolveFence, resolveFenceSpec, type FenceResolution } from '../shared/fence-resolve.ts'
@@ -140,12 +140,15 @@ function FenceFallback({ raw, fenceKey }: { raw: string; fenceKey: Key }) {
  * are absorbed by the operation map's per-source dedup, so the panel folds
  * and notifies exactly once per source. Renders nothing.
  */
-function FencePanelPublisher({ sessionId, sourceId, order, spec }: {
+function FencePanelPublisher({ sessionId, sourceId, order, spec, raw }: {
   sessionId: string
   sourceId: string
   order: readonly [number, number, number]
   spec: GenuiSpec
+  raw: string
 }) {
+  const error = useSyncExternalStore(subscribePanel, () => getPanelOperationError(sessionId, sourceId))
+  useT()
   useEffect(() => {
     const status: PanelOperationStatus = applyPanelOperation(sessionId, {
       sourceId,
@@ -155,7 +158,11 @@ function FencePanelPublisher({ sessionId, sourceId, order, spec }: {
     })
     if (status === 'overflow') diagnosePanelBudget(sessionId, sourceId)
   }, [sessionId, sourceId, order, spec])
-  return null
+  if (error === null) return null
+  return <div>
+    <div style={FENCE_ERROR_STYLE} role="alert">{t('err.fieldValidation', { errors: error })}</div>
+    <CodeBlock {...codeBlockLabels()} code={`${raw}\n`} lang="dsh-ui" />
+  </div>
 }
 
 /**
@@ -167,6 +174,10 @@ function FencePanelPublisher({ sessionId, sourceId, order, spec }: {
  * - Tier-2 completion (missing quotes/brackets): settled renders only —
  *   `context.source` exists exclusively once the message finished, so
  *   streaming halves are never completed early.
+ * - Tier-2 also runs a SHAPE pass before appending closers: it rewrites a
+ *   bracket-balanced but grammatically wrong body (a wrapped member key, a
+ *   "Tetris" table) — the same settled-only gate, since a half-typed body
+ *   must never be reshaped.
  * - Native chart semantics are checked before repair on every candidate so
  *   aliases, empty collections, or line/donut series cannot repair into a
  *   default/blank chart.
@@ -217,6 +228,7 @@ export function renderResolvedFenceNode(raw: string, key: Key, context?: GenuiFe
           sourceId={context.source.id}
           order={context.source.order}
           spec={spec}
+          raw={raw}
         />
       )
     }
@@ -241,6 +253,7 @@ export function renderGenuiFence(raw: string, key: Key, context?: GenuiFenceCont
           sourceId={context.source.id}
           order={context.source.order}
           spec={spec}
+          raw={raw}
         />
       )
     }
